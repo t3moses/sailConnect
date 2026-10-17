@@ -4,7 +4,7 @@ This guide explains how to set up automated deployment to AWS Lightsail using Gi
 
 ## Overview
 
-The `deploy.yml` workflow allows you to deploy JAWS to AWS Lightsail with a single click. It includes:
+The `deploy.yml` workflow allows you to deploy Sail Friday to AWS Lightsail with a single click. It includes:
 
 - ✅ Pre-deployment tests and validation
 - ✅ Automatic database backup
@@ -28,7 +28,7 @@ Before using the deployment workflow, you must configure the following secrets i
 |------------|-------------|---------|
 | `LIGHTSAIL_SSH_KEY` | Private SSH key for authentication | Contents of `LightsailDefaultKey-ca-central-1.pem` |
 | `LIGHTSAIL_HOST` | Server IP address or hostname | `16.52.222.15` |
-| `LIGHTSAIL_USER` | SSH username | `bitnami` |
+| `LIGHTSAIL_USER` | SSH username | `admin` |
 
 ### Optional Staging Secrets (Required if using `staging` environment)
 
@@ -36,7 +36,7 @@ Before using the deployment workflow, you must configure the following secrets i
 |------------|-------------|---------|
 | `LIGHTSAIL_SSH_KEY_STAGING` | Staging private SSH key | Contents of staging PEM key |
 | `LIGHTSAIL_HOST_STAGING` | Staging server IP/hostname | `15.156.254.113` |
-| `LIGHTSAIL_USER_STAGING` | Staging SSH username | `bitnami` |
+| `LIGHTSAIL_USER_STAGING` | Staging SSH username | `admin` |
 
 If you select `staging` in the workflow and these staging secrets are not configured, the workflow fails fast with a clear error.
 
@@ -76,7 +76,7 @@ If you select `staging` in the workflow and these staging secrets are not config
 - Add as secret with name `LIGHTSAIL_HOST`
 
 **LIGHTSAIL_USER:**
-- For Bitnami LAMP stack, this is typically `bitnami`
+- On a plain Debian Lightsail instance this is `admin` (Ubuntu: `ubuntu`). The user needs passwordless `sudo`.
 - Add as secret with name `LIGHTSAIL_USER`
 
 ## How to Deploy
@@ -118,7 +118,7 @@ If you select `staging` in the workflow and these staging secrets are not config
 **Skip database backup (NOT RECOMMENDED):**
 - ⚠️ Only use this for non-production testing
 - ✅ Always keep unchecked for production deployments
-- ℹ️ Backups are named with timestamp: `jaws.backup.YYYYMMDD_HHMMSS.db`
+- ℹ️ Backups are named with timestamp: `sailFriday.backup.YYYYMMDD_HHMMSS.db`
 
 **Deployment environment:**
 - `production` - Live production server (default)
@@ -134,14 +134,14 @@ The deployment workflow executes in 5 stages:
 - ✅ Checks migration files exist (if migrations enabled)
 
 ### 2. Backup Database
-- ✅ Creates timestamped backup: `jaws.backup.YYYYMMDD_HHMMSS.db`
+- ✅ Creates timestamped backup: `sailFriday.backup.YYYYMMDD_HHMMSS.db`
 - ✅ Verifies backup was created
 - ✅ Lists recent backups for reference
 
 ### 3. Deploy Application
 - ✅ Creates deployment package (tar.gz)
 - ✅ Uploads to server via SCP
-- ✅ Extracts files to `/opt/bitnami/jaws/`
+- ✅ Extracts files to `/var/www/html/sailConnect/sailFriday/`
 - ✅ Installs Composer dependencies
 - ✅ Runs database migrations (if enabled)
 - ✅ Sets proper file permissions
@@ -164,7 +164,7 @@ After deployment completes, manually verify:
 
 ### 1. Check API Health
 ```bash
-curl https://your-domain.com/api/events
+curl https://sailfriday.sailconnect.org/api/events
 ```
 
 Expected response:
@@ -178,12 +178,12 @@ Expected response:
 ```
 
 ### 2. Test Authentication
-- Visit: `https://your-domain.com/app/account.html`
+- Visit: `https://sailfriday.sailconnect.org/app/account.html`
 - Log in with test credentials
 - Verify token is accepted
 
 ### 3. Use Debug Page
-Visit: `https://your-domain.com/app/debug.html`
+Visit: `https://sailfriday.sailconnect.org/app/debug.html`
 
 Check:
 - ✅ Token Present: Should show if authenticated
@@ -192,8 +192,8 @@ Check:
 
 ### 4. Monitor Apache Logs
 ```bash
-ssh bitnami@16.52.222.15
-sudo tail -f /opt/bitnami/apache/logs/jaws-error.log
+ssh admin@16.52.222.15
+sudo tail -f /var/log/apache2/sailfriday-error.log
 ```
 
 Watch for any errors during first requests.
@@ -222,8 +222,8 @@ Watch for any errors during first requests.
 
 **Solution:**
 1. Verify SSH key is correct in GitHub secrets
-2. Check server is accessible: `ssh bitnami@16.52.222.15`
-3. Verify database path: `/opt/bitnami/jaws/database/jaws.db`
+2. Check server is accessible: `ssh admin@16.52.222.15`
+3. Verify database path: `/var/www/html/sailConnect/sailFriday/database/sailFriday.db`
 
 ### Deployment Failed at "Deploy Application"
 
@@ -232,7 +232,7 @@ Watch for any errors during first requests.
 **Solution:**
 1. Check SSH connection is stable
 2. Verify server has enough disk space: `df -h`
-3. Check permissions on `/opt/bitnami/jaws/`
+3. Check permissions on `/var/www/html/sailConnect/sailFriday/`
 4. Review workflow logs for specific error
 
 ### Deployment Failed at "Verify Deployment"
@@ -240,18 +240,18 @@ Watch for any errors during first requests.
 **Cause:** API not responding or returning errors
 
 **Solution:**
-1. SSH into server: `ssh bitnami@16.52.222.15`
+1. SSH into server: `ssh admin@16.52.222.15`
 2. Check Apache logs:
    ```bash
-   sudo tail -50 /opt/bitnami/apache/logs/jaws-error.log
+   sudo tail -50 /var/log/apache2/sailfriday-error.log
    ```
 3. Verify Apache is running:
    ```bash
-   sudo /opt/bitnami/ctlscript.sh status apache
+   sudo systemctl status apache2
    ```
 4. Check file permissions:
    ```bash
-   ls -la /opt/bitnami/jaws/database/
+   ls -la /var/www/html/sailConnect/sailFriday/database/
    ```
 5. If needed, follow rollback procedures (see below)
 
@@ -263,7 +263,7 @@ Watch for any errors during first requests.
 1. SSH into server
 2. Check Phinx status:
    ```bash
-   cd /opt/bitnami/jaws
+   cd /var/www/html/sailConnect/sailFriday
    vendor/bin/phinx status --environment=production
    ```
 3. If migration partially applied, rollback:
@@ -292,19 +292,19 @@ If only code has issues (not database):
 If migration caused issues:
 
 ```bash
-ssh bitnami@16.52.222.15
-cd /opt/bitnami/jaws/database
+ssh admin@16.52.222.15
+cd /var/www/html/sailConnect/sailFriday/database
 
 # List available backups
-ls -lh jaws.backup.*
+ls -lh sailFriday.backup.*
 
 # Restore from backup (replace with actual timestamp)
-sudo cp jaws.backup.20260208_143022.db jaws.db
-sudo chown bitnami:daemon jaws.db
-sudo chmod 664 jaws.db
+sudo cp sailFriday.backup.20260208_143022.db sailFriday.db
+sudo chown www-data:www-data sailFriday.db
+sudo chmod 664 sailFriday.db
 
 # Restart Apache
-sudo /opt/bitnami/ctlscript.sh restart apache
+sudo systemctl restart apache2
 ```
 
 ### Full System Rollback
@@ -398,7 +398,7 @@ deploy:
   needs: [pre-deployment-checks, backup-database]
   environment:
     name: production
-    url: https://your-domain.com
+    url: https://sailfriday.sailconnect.org
 ```
 
 Then configure environment protection rules in GitHub:

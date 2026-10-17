@@ -1,8 +1,8 @@
-# Copilot Instructions for JAWS
+# Copilot Instructions for Sail Friday
 
 ## Purpose
 
-JAWS is a PHP REST API for boat fleet and crew assignment management using Clean Architecture.
+Sail Friday is a PHP REST API for boat fleet and crew assignment management using Clean Architecture.
 
 - Stack: PHP 8.1+ (CI: 8.5), SQLite, Phinx, PHPUnit
 - Architecture: Domain → Application → Infrastructure → Presentation

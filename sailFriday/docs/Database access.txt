@@ -1,0 +1,9 @@
+The SQLite database is accessed by both the web app and cron. In WAL mode, opening the database creates side-car files (sailFriday.db-shm and sailFriday.db-wal) owned by whichever user opened it first, and the daily Monolog log file works the same way.
+
+On this plain Apache (Debian) host, Apache runs as www-data and the cron jobs are installed in /etc/cron.d/sailfriday-notify with www-data in the user column. Both processes are therefore the same user, so every side-car file and log file created by either one is accessible to the other. No setgid bit, default ACL or supplementary group is needed.
+
+The directories database/ and logs/ and the database file must be owned by www-data and writable (775 / 664).
+
+Avoid running notify.php, recalculate.php or phinx as root or the SSH user against the live database; if you do, chown www-data:www-data database/sailFriday.db* logs/* afterwards.
+
+(History: on the previous Bitnami host, Apache ran as daemon and cron as bitnami, with different primary groups. That required a setgid directory, a default ACL and adding daemon to bitnami's groups.)

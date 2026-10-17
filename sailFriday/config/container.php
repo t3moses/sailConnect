@@ -1,0 +1,704 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Dependency Injection Container
+ *
+ * This file configures all dependencies for the application following
+ * the Dependency Inversion Principle. Controllers receive use cases,
+ * use cases receive repositories/services (via interfaces), and
+ * repositories/services receive concrete implementations.
+ */
+
+use App\Application\Port\Repository\BoatRepositoryInterface;
+use App\Application\Port\Repository\CrewRepositoryInterface;
+use App\Application\Port\Repository\EventRepositoryInterface;
+use App\Application\Port\Repository\PasswordResetTokenRepositoryInterface;
+use App\Application\Port\Repository\SeasonRepositoryInterface;
+use App\Application\Port\Repository\UserRepositoryInterface;
+use App\Application\Port\Service\EmailServiceInterface;
+use App\Application\Port\Service\EmailTemplateServiceInterface;
+use App\Application\Port\Service\CalendarServiceInterface;
+use App\Application\Port\Service\TimeServiceInterface;
+use App\Application\Port\Service\TokenServiceInterface;
+use App\Application\Port\Service\PasswordServiceInterface;
+use App\Application\Port\Service\LockServiceInterface;
+use App\Application\Port\Service\TransactionServiceInterface;
+use App\Infrastructure\Persistence\SQLite\BoatRepository;
+use App\Infrastructure\Persistence\SQLite\CrewRepository;
+use App\Infrastructure\Persistence\SQLite\EventRepository;
+use App\Infrastructure\Persistence\SQLite\PasswordResetTokenRepository;
+use App\Infrastructure\Persistence\SQLite\SeasonRepository;
+use App\Infrastructure\Persistence\SQLite\UserRepository;
+use App\Infrastructure\Service\MailjetEmailService;
+use App\Infrastructure\Service\PhpMailerEmailService;
+use App\Infrastructure\Service\EmailTemplateService;
+use App\Infrastructure\Service\ICalendarService;
+use App\Infrastructure\Service\SystemTimeService;
+use App\Infrastructure\Service\JwtTokenService;
+use App\Infrastructure\Service\PhpPasswordService;
+use App\Infrastructure\Service\DatabaseTransactionService;
+use App\Infrastructure\Service\SQLiteLockService;
+use App\Domain\Service\SelectionService;
+use App\Domain\Service\AssignmentService;
+use App\Domain\Service\RankingService;
+use Monolog\Logger;
+use Monolog\Handler\RotatingFileHandler;
+use Monolog\Handler\StreamHandler;
+use Monolog\Formatter\JsonFormatter;
+use Psr\Log\LoggerInterface;
+
+// Simple service container
+class Container
+{
+    private array $services = [];
+    private array $factories = [];
+
+    public function set(string $id, callable $factory): void
+    {
+        $this->factories[$id] = $factory;
+    }
+
+    public function get(string $id): mixed
+    {
+        if (isset($this->services[$id])) {
+            return $this->services[$id];
+        }
+
+        if (!isset($this->factories[$id])) {
+            throw new Exception("Service '{$id}' not found in container");
+        }
+
+        $this->services[$id] = $this->factories[$id]($this);
+        return $this->services[$id];
+    }
+
+    public function has(string $id): bool
+    {
+        return isset($this->factories[$id]) || isset($this->services[$id]);
+    }
+}
+
+// Create container
+$container = new Container();
+
+// Load configuration for services that need it
+$config = require __DIR__ . '/config.php';
+
+// =======================
+// Logging
+// =======================
+
+$container->set(LoggerInterface::class, function () use ($config) {
+    $env    = $config['app']['env'] ?? 'production';
+    $logger = new Logger('sailfriday');
+
+    $logFile = __DIR__ . '/../logs/app.log';
+    $handler = in_array($env, ['development', 'local'], true)
+        ? new StreamHandler($logFile, Logger::DEBUG)
+        : new RotatingFileHandler($logFile, maxFiles: 30, level: Logger::INFO);
+
+    $formatter = new JsonFormatter();
+    $formatter->includeStacktraces(true);
+    $handler->setFormatter($formatter);
+    $logger->pushHandler($handler);
+
+    return $logger;
+});
+
+// =======================
+// Infrastructure Layer
+// =======================
+
+// Repositories (Persistence)
+$container->set(BoatRepositoryInterface::class, function () {
+    return new BoatRepository();
+});
+
+$container->set(CrewRepositoryInterface::class, function () {
+    return new CrewRepository();
+});
+
+$container->set(EventRepositoryInterface::class, function ($c) {
+    return new EventRepository($c->get(TimeServiceInterface::class));
+});
+
+$container->set(SeasonRepositoryInterface::class, function () {
+    return new SeasonRepository();
+});
+
+$container->set(UserRepositoryInterface::class, function () {
+    return new UserRepository();
+});
+
+$container->set(PasswordResetTokenRepositoryInterface::class, function () {
+    return new PasswordResetTokenRepository();
+});
+
+// Services (External Adapters)
+$container->set(EmailServiceInterface::class, function ($c) use ($config) {
+    $env = $config['app']['env'] ?? 'production';
+    if (in_array($env, ['development', 'local'], true)) {
+        // Use PHPMailer → MailHog for local email capture
+        return new PhpMailerEmailService(
+            smtpHost: 'localhost',
+            smtpPort: 1025,
+            smtpSecure: ''
+        );
+    }
+    return new MailjetEmailService(logger: $c->get(LoggerInterface::class));
+});
+
+$container->set(EmailTemplateServiceInterface::class, function () {
+    return new EmailTemplateService();
+});
+
+$container->set(CalendarServiceInterface::class, function () {
+    return new ICalendarService();
+});
+
+$container->set(TimeServiceInterface::class, function ($c) {
+    return new SystemTimeService($c->get(SeasonRepositoryInterface::class));
+});
+
+$container->set(TokenServiceInterface::class, function () use ($config) {
+    return new JwtTokenService(
+        $config['jwt']['secret'],
+        $config['jwt']['expiration_minutes']
+    );
+});
+
+$container->set(PasswordServiceInterface::class, function () {
+    return new PhpPasswordService();
+});
+
+$container->set(TransactionServiceInterface::class, function () {
+    return new DatabaseTransactionService();
+});
+
+$container->set(LockServiceInterface::class, function () {
+    return new SQLiteLockService();
+});
+
+// =======================
+// Domain Layer
+// =======================
+
+$container->set(RankingService::class, function ($c) {
+    return new RankingService(
+        $c->get(TimeServiceInterface::class)
+    );
+});
+
+$container->set(SelectionService::class, function () {
+    return new SelectionService();
+});
+
+$container->set(AssignmentService::class, function () {
+    return new AssignmentService();
+});
+
+// =======================
+// Application Layer - Use Cases
+// =======================
+
+// Boat Use Cases
+$container->set(\App\Application\UseCase\Boat\UpdateBoatAvailabilityUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Boat\UpdateBoatAvailabilityUseCase(
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(TimeServiceInterface::class),
+        $c->get(SeasonRepositoryInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+// Crew Use Cases
+$container->set(\App\Application\UseCase\Crew\UpdateCrewAvailabilityUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Crew\UpdateCrewAvailabilityUseCase(
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(TimeServiceInterface::class),
+        $c->get(SeasonRepositoryInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Crew\GetCrewAvailabilityUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Crew\GetCrewAvailabilityUseCase(
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Crew\GetUserAssignmentsUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Crew\GetUserAssignmentsUseCase(
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(SeasonRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Crew\RecordNoShowUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Crew\RecordNoShowUseCase(
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(TransactionServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Boat\FlagAssignedCrewUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Boat\FlagAssignedCrewUseCase(
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(SeasonRepositoryInterface::class),
+        $c->get(\App\Application\UseCase\Crew\RecordNoShowUseCase::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Boat\UpdateAssignedCrewSkillUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Boat\UpdateAssignedCrewSkillUseCase(
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(SeasonRepositoryInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Boat\RemoveAssignedCrewFromWhitelistUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Boat\RemoveAssignedCrewFromWhitelistUseCase(
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(SeasonRepositoryInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+// Event Use Cases
+$container->set(\App\Application\UseCase\Event\GetAllEventsUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Event\GetAllEventsUseCase(
+        $c->get(EventRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Event\GetEventUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Event\GetEventUseCase(
+        $c->get(EventRepositoryInterface::class),
+        $c->get(SeasonRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Event\GetStatusUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Event\GetStatusUseCase(
+        $c->get(SeasonRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(TimeServiceInterface::class)
+    );
+});
+
+// Flotilla Use Cases
+$container->set(\App\Application\UseCase\Flotilla\GetAllFlotillasUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Flotilla\GetAllFlotillasUseCase(
+        $c->get(EventRepositoryInterface::class),
+        $c->get(SeasonRepositoryInterface::class)
+    );
+});
+
+// Season Use Cases
+$container->set(\App\Application\UseCase\Season\ProcessSeasonUpdateUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Season\ProcessSeasonUpdateUseCase(
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(SeasonRepositoryInterface::class),
+        $c->get(SelectionService::class),
+        $c->get(AssignmentService::class),
+        $c->get(RankingService::class),
+        $c->get(TransactionServiceInterface::class),
+        $c->get(LockServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Season\GenerateFlotillaUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Season\GenerateFlotillaUseCase(
+        $c->get(EventRepositoryInterface::class),
+        $c->get(SeasonRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Season\UpdateConfigUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Season\UpdateConfigUseCase(
+        $c->get(SeasonRepositoryInterface::class),
+        $c->get(TimeServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+// Admin Use Cases
+$container->set(\App\Application\UseCase\Admin\GetMatchingDataUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\GetMatchingDataUseCase(
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\GetParticipantEmailsUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\GetParticipantEmailsUseCase(
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(UserRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\SendCustomNotificationUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\SendCustomNotificationUseCase(
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(UserRepositoryInterface::class),
+        $c->get(EmailServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\GetConfigUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\GetConfigUseCase(
+        $c->get(SeasonRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\GetAllUsersUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\GetAllUsersUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(BoatRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\SetUserAdminUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\SetUserAdminUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\GetUserDetailUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\GetUserDetailUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\DeactivateUserUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\DeactivateUserUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(TransactionServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\NotifyUserUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\NotifyUserUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(EmailServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\GetAllCrewsUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\GetAllCrewsUseCase(
+        $c->get(CrewRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\GetAllBoatsUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\GetAllBoatsUseCase(
+        $c->get(BoatRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\GetCrewBoatHistoryUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\GetCrewBoatHistoryUseCase(
+        $c->get(CrewRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\UpdateCrewProfileUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\UpdateCrewProfileUseCase(
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\AddToCrewWhitelistUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\AddToCrewWhitelistUseCase(
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Admin\RemoveFromCrewWhitelistUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Admin\RemoveFromCrewWhitelistUseCase(
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+
+// Cron Use Cases
+$container->set(\App\Application\UseCase\Cron\SendCrewReminderUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Cron\SendCrewReminderUseCase(
+        $c->get(EventRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(UserRepositoryInterface::class),
+        $c->get(EmailServiceInterface::class),
+        $c->get(EmailTemplateServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Cron\SendBoatOwnerReminderUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Cron\SendBoatOwnerReminderUseCase(
+        $c->get(EventRepositoryInterface::class),
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(UserRepositoryInterface::class),
+        $c->get(EmailServiceInterface::class),
+        $c->get(EmailTemplateServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Cron\SendBoatOwnerCrewListUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Cron\SendBoatOwnerCrewListUseCase(
+        $c->get(EventRepositoryInterface::class),
+        $c->get(SeasonRepositoryInterface::class),
+        $c->get(UserRepositoryInterface::class),
+        $c->get(EmailServiceInterface::class),
+        $c->get(EmailTemplateServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Cron\SendCrewListUseCase::class, function ($c) use ($config) {
+    return new \App\Application\UseCase\Cron\SendCrewListUseCase(
+        $c->get(EventRepositoryInterface::class),
+        $c->get(SeasonRepositoryInterface::class),
+        $c->get(UserRepositoryInterface::class),
+        $c->get(EmailServiceInterface::class),
+        $c->get(EmailTemplateServiceInterface::class),
+        $config['email']['admin_notification_email'],
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Cron\SendAssignmentReminderUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Cron\SendAssignmentReminderUseCase(
+        $c->get(EventRepositoryInterface::class),
+        $c->get(SeasonRepositoryInterface::class),
+        $c->get(UserRepositoryInterface::class),
+        $c->get(EmailServiceInterface::class),
+        $c->get(EmailTemplateServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+// Auth Use Cases
+$container->set(\App\Application\UseCase\Auth\RegisterUseCase::class, function ($c) use ($config) {
+    return new \App\Application\UseCase\Auth\RegisterUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(PasswordServiceInterface::class),
+        $c->get(TokenServiceInterface::class),
+        $c->get(RankingService::class),
+        $c->get(EmailServiceInterface::class),
+        $c->get(EmailTemplateServiceInterface::class),
+        $c->get(EventRepositoryInterface::class),
+        $c->get(CalendarServiceInterface::class),
+        $config,
+        $c->get(TransactionServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Auth\LoginUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Auth\LoginUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(PasswordServiceInterface::class),
+        $c->get(TokenServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Auth\GetSessionUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Auth\GetSessionUseCase(
+        $c->get(UserRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Auth\LogoutUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Auth\LogoutUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Auth\ForgotPasswordUseCase::class, function ($c) use ($config) {
+    return new \App\Application\UseCase\Auth\ForgotPasswordUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(PasswordResetTokenRepositoryInterface::class),
+        $c->get(EmailServiceInterface::class),
+        $c->get(EmailTemplateServiceInterface::class),
+        $config,
+        $c->get(LoggerInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\Auth\ResetPasswordUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Auth\ResetPasswordUseCase(
+        $c->get(PasswordResetTokenRepositoryInterface::class),
+        $c->get(UserRepositoryInterface::class),
+        $c->get(PasswordServiceInterface::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+// User Use Cases
+$container->set(\App\Application\UseCase\User\GetUserProfileUseCase::class, function ($c) {
+    return new \App\Application\UseCase\User\GetUserProfileUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(BoatRepositoryInterface::class)
+    );
+});
+
+$container->set(\App\Application\UseCase\User\UpdateUserProfileUseCase::class, function ($c) use ($config) {
+    return new \App\Application\UseCase\User\UpdateUserProfileUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(PasswordServiceInterface::class),
+        $c->get(\App\Application\UseCase\User\GetUserProfileUseCase::class),
+        $c->get(EmailServiceInterface::class),
+        $c->get(EmailTemplateServiceInterface::class),
+        $config['email']['admin_notification_email'],
+        $c->get(LoggerInterface::class),
+        $config['email']['registration_notification_email_secondary'] ?? null,
+    );
+});
+
+$container->set(\App\Application\UseCase\User\AddProfileUseCase::class, function ($c) {
+    return new \App\Application\UseCase\User\AddProfileUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class),
+        $c->get(BoatRepositoryInterface::class),
+        $c->get(RankingService::class),
+        $c->get(\App\Application\UseCase\User\GetUserProfileUseCase::class),
+        $c->get(LoggerInterface::class)
+    );
+});
+
+// =======================
+// Presentation Layer - Controllers
+// =======================
+
+$container->set(\App\Presentation\Controller\EventController::class, function ($c) {
+    return new \App\Presentation\Controller\EventController(
+        $c->get(\App\Application\UseCase\Event\GetAllEventsUseCase::class),
+        $c->get(\App\Application\UseCase\Event\GetEventUseCase::class),
+        $c->get(\App\Application\UseCase\Flotilla\GetAllFlotillasUseCase::class),
+        $c->get(\App\Application\UseCase\Event\GetStatusUseCase::class)
+    );
+});
+
+$container->set(\App\Presentation\Controller\AvailabilityController::class, function ($c) {
+    return new \App\Presentation\Controller\AvailabilityController(
+        $c->get(\App\Application\UseCase\Boat\UpdateBoatAvailabilityUseCase::class),
+        $c->get(\App\Application\UseCase\Crew\UpdateCrewAvailabilityUseCase::class),
+        $c->get(\App\Application\UseCase\Crew\GetCrewAvailabilityUseCase::class),
+        $c->get(\App\Application\UseCase\Season\ProcessSeasonUpdateUseCase::class)
+    );
+});
+
+$container->set(\App\Presentation\Controller\AssignmentController::class, function ($c) {
+    return new \App\Presentation\Controller\AssignmentController(
+        $c->get(\App\Application\UseCase\Crew\GetUserAssignmentsUseCase::class),
+        $c->get(\App\Application\UseCase\Boat\FlagAssignedCrewUseCase::class),
+        $c->get(\App\Application\UseCase\Boat\UpdateAssignedCrewSkillUseCase::class),
+        $c->get(\App\Application\UseCase\Boat\RemoveAssignedCrewFromWhitelistUseCase::class),
+        $c->get(\App\Application\UseCase\Season\ProcessSeasonUpdateUseCase::class)
+    );
+});
+
+$container->set(\App\Presentation\Controller\AdminController::class, function ($c) {
+    return new \App\Presentation\Controller\AdminController(
+        $c->get(\App\Application\UseCase\Admin\GetMatchingDataUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\GetParticipantEmailsUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\SendCustomNotificationUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\GetConfigUseCase::class),
+        $c->get(\App\Application\UseCase\Season\UpdateConfigUseCase::class),
+        $c->get(\App\Application\UseCase\Season\ProcessSeasonUpdateUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\GetAllUsersUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\SetUserAdminUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\GetUserDetailUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\GetAllCrewsUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\GetAllBoatsUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\GetCrewBoatHistoryUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\UpdateCrewProfileUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\AddToCrewWhitelistUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\RemoveFromCrewWhitelistUseCase::class),
+        $c->get(\App\Application\UseCase\Crew\RecordNoShowUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\DeactivateUserUseCase::class),
+        $c->get(\App\Application\UseCase\Admin\NotifyUserUseCase::class)
+    );
+});
+
+$container->set(\App\Presentation\Controller\AuthController::class, function ($c) {
+    return new \App\Presentation\Controller\AuthController(
+        $c->get(\App\Application\UseCase\Auth\RegisterUseCase::class),
+        $c->get(\App\Application\UseCase\Auth\LoginUseCase::class),
+        $c->get(\App\Application\UseCase\Auth\GetSessionUseCase::class),
+        $c->get(\App\Application\UseCase\Auth\LogoutUseCase::class),
+        $c->get(\App\Application\UseCase\Auth\ForgotPasswordUseCase::class),
+        $c->get(\App\Application\UseCase\Auth\ResetPasswordUseCase::class)
+    );
+});
+
+$container->set(\App\Presentation\Controller\UserController::class, function ($c) {
+    return new \App\Presentation\Controller\UserController(
+        $c->get(\App\Application\UseCase\User\GetUserProfileUseCase::class),
+        $c->get(\App\Application\UseCase\User\AddProfileUseCase::class),
+        $c->get(\App\Application\UseCase\User\UpdateUserProfileUseCase::class)
+    );
+});
+
+// =======================
+// Presentation Layer - Middleware
+// =======================
+
+$container->set(\App\Presentation\Middleware\JwtAuthMiddleware::class, function ($c) {
+    return new \App\Presentation\Middleware\JwtAuthMiddleware(
+        $c->get(TokenServiceInterface::class)
+    );
+});
+
+$container->set(\App\Presentation\Middleware\ErrorHandlerMiddleware::class, function ($c) {
+    return new \App\Presentation\Middleware\ErrorHandlerMiddleware(
+        $c->get(LoggerInterface::class)
+    );
+});
+
+return $container;

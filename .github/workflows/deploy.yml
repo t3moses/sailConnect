@@ -27,6 +27,10 @@ jobs:
     name: Pre-Deployment Checks
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: sailFriday
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -65,6 +69,10 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: pre-deployment-checks
+
+    defaults:
+      run:
+        working-directory: sailFriday
 
     steps:
       - name: Checkout code
@@ -173,15 +181,15 @@ jobs:
         run: |
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           ssh -i ~/.ssh/lightsail_key "$TARGET_USER@$TARGET_HOST" \
-            "cd /opt/bitnami/jaws/database && \
-             sudo cp jaws.db jaws.backup.${TIMESTAMP}.db && \
-             echo 'Backup created: jaws.backup.${TIMESTAMP}.db' && \
-             ls -lh jaws.backup.${TIMESTAMP}.db"
+            "cd /var/www/html/sailConnect/sailFriday/database && \
+             sudo cp sailFriday.db sailFriday.backup.${TIMESTAMP}.db && \
+             echo 'Backup created: sailFriday.backup.${TIMESTAMP}.db' && \
+             ls -lh sailFriday.backup.${TIMESTAMP}.db"
 
       - name: Verify backup
         run: |
           ssh -i ~/.ssh/lightsail_key "$TARGET_USER@$TARGET_HOST" \
-            "ls -lh /opt/bitnami/jaws/database/jaws.backup.*.db | tail -5"
+            "ls -lh /var/www/html/sailConnect/sailFriday/database/sailFriday.backup.*.db | tail -5"
 
   deploy:
     name: Deploy Application
@@ -189,6 +197,10 @@ jobs:
     environment: ${{ inputs.environment }}
     needs: [e2e-tests, backup-database]
     if: always() && needs.e2e-tests.result == 'success' && (needs['backup-database'].result == 'success' || needs['backup-database'].result == 'skipped')
+
+    defaults:
+      run:
+        working-directory: sailFriday
 
     steps:
       - name: Checkout code
@@ -259,11 +271,14 @@ jobs:
 
             echo "Extracting deployment package..."
             cd /tmp
-            tar -xzf deploy.tar.gz -C /opt/bitnami/jaws/
+            sudo mkdir -p /var/www/html/sailConnect/sailFriday
+            sudo tar -xzf deploy.tar.gz -C /var/www/html/sailConnect/sailFriday/
 
             echo "Setting initial permissions..."
-            sudo chown -R bitnami:daemon /opt/bitnami/jaws
-            sudo chmod -R g+w /opt/bitnami/jaws
+            # Code is owned by the SSH user (so Composer can write vendor/),
+            # group www-data so Apache can read it.
+            sudo chown -R "$USER":www-data /var/www/html/sailConnect/sailFriday
+            sudo chmod -R g+w /var/www/html/sailConnect/sailFriday
 
             echo "Deployment files extracted successfully"
           ENDSSH
@@ -272,7 +287,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/lightsail_key "$TARGET_USER@$TARGET_HOST" << 'ENDSSH'
             set -e
-            cd /opt/bitnami/jaws
+            cd /var/www/html/sailConnect/sailFriday
 
             echo "Installing Composer dependencies..."
             composer install --optimize-autoloader --no-dev
@@ -285,7 +300,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/lightsail_key "$TARGET_USER@$TARGET_HOST" << 'ENDSSH'
             set -e
-            cd /opt/bitnami/jaws
+            cd /var/www/html/sailConnect/sailFriday
 
             echo "Checking migration status..."
             vendor/bin/phinx status --environment=production || true
@@ -301,36 +316,37 @@ jobs:
         run: |
           ssh -i ~/.ssh/lightsail_key "$TARGET_USER@$TARGET_HOST" << 'ENDSSH'
             set -e
-            cd /opt/bitnami/jaws
+            cd /var/www/html/sailConnect/sailFriday
 
             echo "Setting final file permissions..."
 
-            # Ensure proper ownership
-            sudo chown -R bitnami:daemon /opt/bitnami/jaws
+            # Code is owned by the SSH user, group www-data (Apache)
+            sudo chown -R "$USER":www-data /var/www/html/sailConnect/sailFriday
 
             # Application code - standard permissions
-            sudo find /opt/bitnami/jaws/src -type d -exec chmod 755 {} \;
-            sudo find /opt/bitnami/jaws/src -type f -exec chmod 644 {} \;
-            sudo find /opt/bitnami/jaws/config -type d -exec chmod 755 {} \;
-            sudo find /opt/bitnami/jaws/config -type f -exec chmod 644 {} \;
+            sudo find /var/www/html/sailConnect/sailFriday/src -type d -exec chmod 755 {} \;
+            sudo find /var/www/html/sailConnect/sailFriday/src -type f -exec chmod 644 {} \;
+            sudo find /var/www/html/sailConnect/sailFriday/config -type d -exec chmod 755 {} \;
+            sudo find /var/www/html/sailConnect/sailFriday/config -type f -exec chmod 644 {} \;
 
             # Public files - readable by web server
-            sudo find /opt/bitnami/jaws/public -type d -exec chmod 755 {} \;
-            sudo find /opt/bitnami/jaws/public -type f -exec chmod 644 {} \;
+            sudo find /var/www/html/sailConnect/sailFriday/public -type d -exec chmod 755 {} \;
+            sudo find /var/www/html/sailConnect/sailFriday/public -type f -exec chmod 644 {} \;
 
-            # Database - read/write for Apache (daemon group). Setgid (2775,
-            # not 775) is required: the hourly notify.php cron runs as
-            # bitnami, which is not in the daemon group, and in WAL mode even
-            # a read-only query can leave jaws.db-wal/-shm owned bitnami:bitnami
-            # without it - breaking web writes until the WAL is recreated.
-            # See docs/DEPLOYMENT.md Step 7.
-            sudo chmod 2775 /opt/bitnami/jaws/database
-            sudo chmod 664 /opt/bitnami/jaws/database/jaws.db
+            # Database - Apache (www-data) must own and write it. Cron jobs
+            # also run as www-data (see /etc/cron.d/sailfriday-notify), so web and
+            # cron share one identity and no setgid/ACL workaround is needed.
+            sudo chown www-data:www-data /var/www/html/sailConnect/sailFriday/database
+            sudo chmod 775 /var/www/html/sailConnect/sailFriday/database
+            if [ -f /var/www/html/sailConnect/sailFriday/database/sailFriday.db ]; then
+              sudo chown www-data:www-data /var/www/html/sailConnect/sailFriday/database/sailFriday.db
+              sudo chmod 664 /var/www/html/sailConnect/sailFriday/database/sailFriday.db
+            fi
 
-            # Logs - writable by Monolog (PHP/daemon) and cron (bitnami)
-            sudo mkdir -p /opt/bitnami/jaws/logs
-            sudo chown bitnami:daemon /opt/bitnami/jaws/logs
-            sudo chmod 775 /opt/bitnami/jaws/logs
+            # Logs - writable by Monolog (PHP) and cron, both www-data
+            sudo mkdir -p /var/www/html/sailConnect/sailFriday/logs
+            sudo chown www-data:www-data /var/www/html/sailConnect/sailFriday/logs
+            sudo chmod 775 /var/www/html/sailConnect/sailFriday/logs
 
             echo "Permissions set successfully"
           ENDSSH
@@ -338,7 +354,7 @@ jobs:
       - name: Restart Apache
         run: |
           ssh -i ~/.ssh/lightsail_key "$TARGET_USER@$TARGET_HOST" \
-            "sudo /opt/bitnami/ctlscript.sh restart apache"
+            "sudo systemctl restart apache2"
 
       - name: Cleanup temporary files
         if: always()
@@ -417,7 +433,7 @@ jobs:
         if: failure()
         run: |
           ssh -i ~/.ssh/lightsail_key "$TARGET_USER@$TARGET_HOST" \
-            "sudo tail -50 /opt/bitnami/apache/logs/error_log"
+            "sudo tail -50 /var/log/apache2/error.log"
 
   post-deployment-notification:
     name: Post-Deployment Notification
