@@ -129,6 +129,7 @@ final class Controller
             $this->sessions->destroy($this->sessionToken);
         }
         $this->clearCookie($this->config->cookieName());
+        $this->clearCookie(Config::HINT_COOKIE);
         $this->redirect($this->returnUrl() ?? '/signin?notice=signed-out');
     }
 
@@ -436,6 +437,7 @@ final class Controller
                 $this->sessionToken = $token;
             } else {
                 $this->clearCookie($this->config->cookieName());
+                $this->clearCookie(Config::HINT_COOKIE);
             }
         }
     }
@@ -444,6 +446,7 @@ final class Controller
     {
         $token = $this->sessions->create($userId, $_SERVER['REMOTE_ADDR'] ?? null, $_SERVER['HTTP_USER_AGENT'] ?? null);
         $this->setCookie($this->config->cookieName(), $token, $this->config->cookieDomain());
+        $this->setCookie(Config::HINT_COOKIE, '1', $this->config->cookieDomain(), false);
     }
 
     private function bootCsrf(): void
@@ -461,11 +464,11 @@ final class Controller
         return hash_equals($this->csrf, (string) ($_POST['csrf'] ?? ''));
     }
 
-    private function setCookie(string $name, string $value, string $domain): void
+    private function setCookie(string $name, string $value, string $domain, bool $httpOnly = true): void
     {
         setcookie($name, $value, [
             'expires' => 0, 'path' => '/', 'domain' => $domain,
-            'secure' => $this->config->isSecure(), 'httponly' => true, 'samesite' => 'Lax',
+            'secure' => $this->config->isSecure(), 'httponly' => $httpOnly, 'samesite' => 'Lax',
         ]);
     }
 
@@ -473,7 +476,7 @@ final class Controller
     {
         setcookie($name, '', [
             'expires' => 1, 'path' => '/', 'domain' => $this->config->cookieDomain(),
-            'secure' => $this->config->isSecure(), 'httponly' => true, 'samesite' => 'Lax',
+            'secure' => $this->config->isSecure(), 'httponly' => $name !== Config::HINT_COOKIE, 'samesite' => 'Lax',
         ]);
     }
 

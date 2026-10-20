@@ -16,14 +16,16 @@ final class Config
     {
     }
 
+    /**
+     * Reads <rootDir>/.env only. It never touches the process environment, so applications that embed
+     * the session verifier (and have their own DB_PATH, APP_URL, SMTP_* ...) cannot leak into or
+     * override auth's settings.
+     */
     public static function load(string $rootDir): self
     {
-        if (file_exists($rootDir . '/.env')) {
-            Dotenv::createImmutable($rootDir)->safeLoad();
-        }
-        $env = $_ENV + $_SERVER;
-        $strings = array_filter($env, 'is_string');
-        return new self($strings + ['_ROOT' => $rootDir]);
+        $file = $rootDir . '/.env';
+        $env = is_file($file) ? Dotenv::parse((string) file_get_contents($file)) : [];
+        return new self($env + ['_ROOT' => $rootDir]);
     }
 
     public function get(string $key, string $default = ''): string
@@ -68,6 +70,9 @@ final class Config
     {
         return $this->get('COOKIE_NAME', 'sc_session');
     }
+
+    /** Readable (non-HttpOnly) marker so front ends can pick signed-in/out navigation synchronously. */
+    public const HINT_COOKIE = 'sc_signed_in';
 
     public function cookieDomain(): string
     {

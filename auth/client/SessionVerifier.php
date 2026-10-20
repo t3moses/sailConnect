@@ -17,10 +17,15 @@ use SailConnect\Auth\SessionService;
  *   $user = $auth->currentUser();            // null when not signed in
  *   $auth->requireUser();                    // redirects to the sign-in page when not signed in
  */
-final class SessionVerifier
+class SessionVerifier
 {
-    public function __construct(private SessionService $sessions, private string $cookieName, private string $authUrl)
-    {
+    public function __construct(
+        private SessionService $sessions,
+        private string $cookieName,
+        private string $authUrl,
+        private string $cookieDomain = '',
+        private bool $secure = true,
+    ) {
     }
 
     public static function fromAuthDir(string $authDir): self
@@ -31,6 +36,8 @@ final class SessionVerifier
             new SessionService($db, $config->inactivitySeconds(), $config->sessionMaxSeconds()),
             $config->cookieName(),
             $config->appUrl(),
+            $config->cookieDomain(),
+            $config->isSecure(),
         );
     }
 
@@ -41,7 +48,12 @@ final class SessionVerifier
     public function currentUser(): ?array
     {
         $token = $_COOKIE[$this->cookieName] ?? null;
-        return is_string($token) && $token !== '' ? $this->sessions->validate($token) : null;
+        $user = is_string($token) && $token !== '' ? $this->sessions->validate($token) : null;
+        if ($user === null && isset($_COOKIE[Config::HINT_COOKIE]) && !headers_sent()) {
+            // Stale "signed in" hint (expired or signed off elsewhere): drop it so navigation matches reality.
+            setcookie(Config::HINT_COOKIE, '', ['expires' => 1, 'path' => '/', 'domain' => $this->cookieDomain, 'secure' => $this->secure, 'samesite' => 'Lax']);
+        }
+        return $user;
     }
 
     /** @return array<string,mixed> */

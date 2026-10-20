@@ -2,12 +2,11 @@
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-if (file_exists(__DIR__ . '/.env')) {
-    Dotenv\Dotenv::createImmutable(__DIR__)->safeLoad();
+// Same source as the web app: auth/.env only. Seeds read SEED_ADMIN_* from $_ENV.
+$env = SailConnect\Auth\Config::load(__DIR__);
+foreach (['SEED_ADMIN_EMAIL', 'SEED_ADMIN_FIRST_NAME', 'SEED_ADMIN_LAST_NAME', 'SEED_ADMIN_PASSWORD'] as $k) {
+    $_ENV[$k] = $env->get($k);
 }
-
-$dbPath = $_ENV['DB_PATH'] ?? './database/auth.db';
-$name = preg_replace('/\.db$/', '', $dbPath);
 
 return [
     'paths' => [
@@ -19,7 +18,7 @@ return [
         'default_environment' => 'main',
         'main' => [
             'adapter' => 'sqlite',
-            'name' => $name,
+            'name' => preg_replace('/\.db$/', '', $env->dbPath()),
             'suffix' => '.db',
         ],
     ],

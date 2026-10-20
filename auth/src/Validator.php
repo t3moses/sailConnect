@@ -36,7 +36,7 @@ final class Validator
 
     public static function membershipNumber(string $n): bool
     {
-        return preg_match('/^[A-Za-z0-9]{1,20}$/', $n) === 1;
+        return preg_match('/^[A-Za-z0-9][A-Za-z0-9-]{0,19}$/', $n) === 1;
     }
 
     /**
@@ -55,7 +55,7 @@ final class Validator
             $errors['last_name'] = 'Last name is required.';
         }
         if (!empty($in['is_member']) && !self::membershipNumber((string) ($in['membership_number'] ?? ''))) {
-            $errors['membership_number'] = 'Membership number is required for members (letters and digits only).';
+            $errors['membership_number'] = 'Membership number is required for members (letters, digits and hyphens).';
         }
         return $errors;
     }

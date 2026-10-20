@@ -27,7 +27,7 @@
     <?php if (!empty($errors['captcha'])): ?><p class="err"><?= $e($errors['captcha']) ?></p><?php endif; ?>
     <button type="submit">Create account</button>
   </form>
-  <p class="hint">Already registered? <a href="/signin">Sign in</a></p>
+  <p class="hint">Already registered? <a href="/signin<?= $return !== '' ? '?return=' . $e(urlencode($return)) : '' ?>">Sign in</a></p>
 </div>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script>

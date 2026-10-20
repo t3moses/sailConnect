@@ -36,8 +36,26 @@ $user = $auth->requireUser();    // redirects to auth.sailConnect.org/signin?ret
 //        membership_number, is_platform_admin, is_platform_active
 ```
 
-The verifier reads the auth database directly (same server) and only writes `sessions.last_touch`.
+The verifier reads the auth database directly (same server) and only writes `sessions.last_touch`; the web-server
+user therefore needs write access to the database. It reads `auth/.env` only (never the calling application's
+environment), so the application's own `DB_PATH`, `APP_URL` etc. cannot interfere.
 Sign-in redirects back only to hosts under `ALLOWED_RETURN_HOSTS`.
+
+Besides the `HttpOnly` session cookie, sign-in sets a readable `sc_signed_in=1` marker so front ends can choose
+signed-in or signed-out navigation synchronously. It is only a hint; the verifier clears it when it finds the session invalid.
+
+sailFriday integrates through this library (`../sailFriday/docs/SSO.md`), and migrates existing users with
+`php bin/migrate-users-to-auth.php` there.
+
+## Membership numbers
+
+Letters, digits and hyphens, up to 20 characters, starting with a letter or digit (the club format is like `7060-13489`).
+
+## Tests
+
+```bash
+vendor/bin/phpunit
+```
 
 ## .env
 
