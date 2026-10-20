@@ -6,6 +6,7 @@ Complete guide for deploying Sail Friday to production on AWS Lightsail.
 
 - [Pre-Deployment Checklist](#pre-deployment-checklist)
 - [AWS Lightsail Deployment](#aws-lightsail-deployment)
+- [Deploying the sailConnect Auth Service](#deploying-the-sailconnect-auth-service)
 - [Server Layout (Debian, Plain Apache)](#server-layout-debian-plain-apache)
 - [Environment Configuration](#environment-configuration)
 - [Database Management](#database-management)
@@ -91,7 +92,7 @@ Apache must serve `/var/www/html/sailConnect/sailFriday/public` as this app's Do
 </VirtualHost>
 ```
 
-Each app gets its own vhost file on the same pattern, with its own `ServerName` and DocumentRoot: `sailfriday.sailconnect.org` → `.../sailConnect/sailFriday/public`, `matchrace.sailconnect.org` → `.../sailConnect/matchRace/public`, `auth.sailconnect.org` → `.../sailConnect/auth/public` (confirm the final domain for `auth`). DNS: create A records (or one wildcard `*.sailconnect.org`) pointing at the Lightsail static IP.
+Each app gets its own vhost file on the same pattern, with its own `ServerName` and DocumentRoot: `sailfriday.sailconnect.org` → `.../sailConnect/sailFriday/public`, `matchrace.sailconnect.org` → `.../sailConnect/matchRace/public`, `auth.sailconnect.org` → `.../sailConnect/auth/public` (see [Deploying the sailConnect Auth Service](#deploying-the-sailconnect-auth-service)). The vhosts for `sailconnect.org`, `sailfriday.sailconnect.org` and `matchrace.sailconnect.org` already exist on the production server and are covered by the wildcard certificate below. DNS: create A records (or one wildcard `*.sailconnect.org`) pointing at the Lightsail static IP.
 
 Enable it and disable the default site:
 
@@ -443,16 +444,163 @@ sudo tail -f /var/log/apache2/sailfriday-error.log
 
 ---
 
+## Deploying the sailConnect Auth Service
+
+`auth.sailConnect.org` is the single sign-on service for every app (see [SSO.md](SSO.md) and `auth/README.md`).
+It is deployed **before** sailFriday is switched over, because sailFriday reads its database. It needs a vhost of its
+own; the existing wildcard certificate (`/etc/letsencrypt/live/sailconnect.org/`) already covers `auth.sailconnect.org`,
+and DNS is covered by the same A record or wildcard as the other apps.
+
+### 1. Upload and install
+
+The auth directory sits next to the apps, because sailFriday finds it at `../auth`:
+
+```
+/var/www/html/sailConnect/auth          <- DocumentRoot is auth/public
+/var/www/html/sailConnect/sailFriday
+/var/www/html/sailConnect/matchRace
+```
+
+Upload `auth/` the same way as sailFriday (Steps 1-5 above; exclude `.env`, `vendor/`, `database/*.db*` and `var/*`), then:
+
+```bash
+cd /var/www/html/sailConnect/auth
+composer install --no-dev --optimize-autoloader
+sudo mkdir -p database var
+```
+
+sailFriday resolves `../auth` through a Composer path package, so after deploying both, run
+`composer install --no-dev --optimize-autoloader` in `sailFriday` as well.
+
+### 2. Configure `.env`
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+| Setting | Production value |
+|---------|------------------|
+| `APP_URL` | `https://auth.sailConnect.org` (no trailing slash) |
+| `COOKIE_DOMAIN` | `.sailConnect.org` (leading dot: the session cookie is shared by every subdomain) |
+| `ALLOWED_RETURN_HOSTS` | `sailConnect.org` (sign-in may only redirect back to this domain and its subdomains) |
+| `DB_PATH` | `/var/www/html/sailConnect/auth/database/auth.db` |
+| `CLUB_ADMIN_EMAIL` | the club administrator's address |
+| `INACTIVITY_EXPIRY_MINUTES` | e.g. `30` |
+| `TERMS_OF_USE_URL` | the terms of use page |
+| `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | real Cloudflare Turnstile keys (the example file holds Cloudflare's always-pass **test** keys; replace them) and add `auth.sailconnect.org` as a hostname in the Turnstile widget |
+| `SMTP_*`, `EMAIL_FROM` | the same SMTP account the apps use; `EMAIL_FROM` should be an address your SMTP provider has verified |
+| `SEED_ADMIN_*` | the first platform admin (needed only for the seeder; remove `SEED_ADMIN_PASSWORD` afterwards) |
+
+`APP_DEBUG=false`. The `https://` in `APP_URL` is what makes the session cookie `Secure`, so it must be correct.
+
+### 3. Create the database and the first platform admin
+
+```bash
+cd /var/www/html/sailConnect/auth
+vendor/bin/phinx migrate
+vendor/bin/phinx seed:run -s PlatformAdminSeeder
+```
+
+Then remove `SEED_ADMIN_PASSWORD` from `.env`.
+
+### 4. Permissions
+
+The web-server user writes to the database (including sessions' `last_touch` from every app, and SQLite's `-wal`/`-shm`
+files), so it must own the `database/` directory:
+
+```bash
+sudo chown -R admin:www-data /var/www/html/sailConnect/auth
+sudo chown -R www-data:www-data /var/www/html/sailConnect/auth/database /var/www/html/sailConnect/auth/var
+sudo chmod 775 /var/www/html/sailConnect/auth/database /var/www/html/sailConnect/auth/var
+sudo chmod 640 /var/www/html/sailConnect/auth/.env
+sudo chgrp www-data /var/www/html/sailConnect/auth/.env
+```
+
+The sailFriday cron jobs (`bin/sync-identity.php`, `bin/notify.php`, ...) run as `www-data` in the existing setup, so they can
+open the auth database as well.
+
+### 5. Apache virtual hosts
+
+**File:** `/etc/apache2/sites-available/auth.conf`
+
+```apache
+<VirtualHost *:80>
+    ServerName auth.sailconnect.org
+    Redirect permanent / https://auth.sailconnect.org/
+</VirtualHost>
+```
+
+**File:** `/etc/apache2/sites-available/auth-ssl.conf`
+
+```apache
+<VirtualHost *:443>
+    ServerName auth.sailconnect.org
+    DocumentRoot /var/www/html/sailConnect/auth/public
+
+    SSLEngine on
+    SSLCertificateFile    /etc/letsencrypt/live/sailconnect.org/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/sailconnect.org/privkey.pem
+
+    <Directory /var/www/html/sailConnect/auth/public>
+        Options -Indexes +FollowSymLinks -MultiViews
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    Header always set Strict-Transport-Security "max-age=31536000"
+
+    ErrorLog ${APACHE_LOG_DIR}/auth-error.log
+    CustomLog ${APACHE_LOG_DIR}/auth-access.log combined
+</VirtualHost>
+```
+
+(Use the certificate directory shown by `sudo certbot certificates` if it differs from the path above.)
+
+```bash
+sudo a2ensite auth auth-ssl
+sudo apachectl configtest
+sudo systemctl reload apache2
+```
+
+`auth/public/.htaccess` routes everything except real files (the stylesheet) to `index.php`. `.env`, `src/`, `database/` and
+`var/` sit outside `public/` and are not web-accessible.
+
+### 6. Verify
+
+```bash
+curl -sI https://auth.sailconnect.org/signin | head -3          # 200 OK
+curl -sI http://auth.sailconnect.org/ | grep -i location        # redirects to https
+```
+
+In a browser: register a test account (Turnstile appears, a confirmation email arrives, the platform admins and club admin are
+notified), sign in, then open `https://sailfriday.sailconnect.org` and confirm you are already signed in. In the browser's
+developer tools the `sc_session` cookie should show `Domain: .sailconnect.org`, `Secure`, `HttpOnly`. Sign out and confirm
+sailFriday treats you as signed out. Leave the session idle for longer than `INACTIVITY_EXPIRY_MINUTES` to confirm it expires.
+
+### 7. Switch sailFriday over
+
+Back up both databases (Step 2 above, plus `cp auth/database/auth.db`), deploy sailFriday, run `vendor/bin/phinx migrate`,
+then migrate the users and add the identity-sync cron entry as described in [SSO.md](SSO.md#first-time-setup). Existing
+sailFriday sessions (JWTs) stop working at this point and users sign in once at the auth service.
+
+### Backups
+
+`auth/database/auth.db` is the only copy of every user's credentials. Add it to the same backup routine as the sailFriday database
+(see [Backup Procedures](#backup-procedures)), using `sqlite3 ... ".backup ..."` rather than copying the file while WAL is active.
+
+---
+
 ## Server Layout (Debian, Plain Apache)
 
-Production and dev are both plain **Debian** Lightsail instances with a hand-installed Apache/PHP stack — **not** Bitnami.
+Production and dev are both plain **Debian** Lightsail instances with a hand-installed Apache/PHP stack — **not** Bitnami. Name-based vhosts exist for `sailconnect.org`, `sailfriday.sailconnect.org` and `matchrace.sailconnect.org`, all sharing one wildcard Let's Encrypt certificate for `*.sailconnect.org`; `auth.sailconnect.org` is added by [Deploying the sailConnect Auth Service](#deploying-the-sailconnect-auth-service).
 
 | | Value |
 |---|---|
 | Domains | `sailfriday.sailconnect.org` (sailFriday), `matchrace.sailconnect.org` (matchRace), `auth.sailconnect.org` (single sign-on), `sailconnect.org` (landing) |
 | Monorepo root on server | `/var/www/html/sailConnect/` (`sailFriday/`, `matchRace/`, `auth/`) |
 | sailFriday app root | `/var/www/html/sailConnect/sailFriday` |
-| Apache DocumentRoot | `/var/www/html/sailConnect/sailFriday/public` |
+| Apache DocumentRoot | `/var/www/html/sailConnect/sailFriday/public` (auth: `.../auth/public`, matchRace: `.../matchRace/public`) |
 | Web server user/group | `www-data:www-data` (uid 33) |
 | Deploy/SSH user | `admin` |
 | Apache service | `sudo systemctl restart apache2` |
