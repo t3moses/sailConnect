@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+// phpcs:disable PSR1.Classes.ClassDeclaration.MissingNamespace
+// Phinx seeders must be declared in the global namespace.
+
 use Phinx\Seed\AbstractSeed;
 
 /**
@@ -391,7 +394,10 @@ class TestDataSeeder3 extends AbstractSeed
         // ====================================================================
         // Link boats to users by fetching user IDs from emails
         $this->execute("
-            INSERT INTO boats (key, display_name, owner_first_name, owner_last_name, owner_mobile, min_berths, max_berths, assistance_required, social_preference, owner_user_id)
+            INSERT INTO boats (
+                key, display_name, owner_first_name, owner_last_name, owner_mobile,
+                min_berths, max_berths, assistance_required, social_preference, owner_user_id
+            )
             VALUES
                 ('ba0b3f1n0', 'BA0B3F1N0', 'A', 'A', '555-0001', 1, 2, 'Yes', 'Yes',
                  (SELECT id FROM users WHERE email = 'ba0b3f1n0@example.com')),
