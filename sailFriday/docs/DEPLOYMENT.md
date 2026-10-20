@@ -516,7 +516,8 @@ sudo chgrp www-data /var/www/auth/.env && sudo chmod 640 /var/www/auth/.env
 ```
 
 Every app (running as `www-data`) writes `sessions.last_touch` through the verifier, so `www-data` must own the database and its
-directory (SQLite also creates `-wal` / `-shm` files there). The `admin` user must use `sudo -u www-data sqlite3 ...` to inspect it.
+directory (SQLite also creates `-wal` / `-shm` files there). The deploy user `admin` is a member of the `www-data` group
+(`sudo usermod -aG www-data admin`, applies from the next login) so it can inspect and back up the database without `sudo`.
 
 ### 5. Apache
 
@@ -587,7 +588,13 @@ that point and users sign in once at the auth service.
 ### Backups
 
 `auth/database/auth.db` is the only copy of every user's credentials. Add it to the same backup routine as the sailFriday database
-(see [Backup Procedures](#backup-procedures)), using `sudo -u www-data sqlite3 ... ".backup ..."` rather than copying the file while WAL is active.
+(see [Backup Procedures](#backup-procedures)), using SQLite's online backup rather than copying the file while WAL is active:
+
+```bash
+sqlite3 /var/www/auth/database/auth.db ".backup $HOME/backups/auth-$(date +%Y%m%d_%H%M%S).db" && chmod 600 $HOME/backups/auth-*.db
+```
+
+Backups contain password hashes: keep them mode 600 and off the web root.
 
 ---
 
