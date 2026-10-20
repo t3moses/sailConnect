@@ -1,0 +1,28 @@
+:root { --bg:#f4f6f9; --card:#fff; --text:#1c2733; --muted:#5b6b7b; --brand:#0b5cad; --border:#d5dce4; --err:#b3261e; --ok:#1e7a3c; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#0f1720; --card:#18222d; --text:#e6edf3; --muted:#93a3b3; --brand:#5aa6f0; --border:#2b3a49; --err:#ff8a80; --ok:#6fd08c; }
+}
+* { box-sizing: border-box; }
+body { margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
+header.top { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:var(--card); border-bottom:1px solid var(--border); }
+header.top a { color:var(--brand); text-decoration:none; margin-left:12px; }
+header.top strong { font-size:1.1rem; }
+main { max-width:560px; margin:24px auto; padding:0 16px; }
+main.wide { max-width:960px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:20px; }
+h1 { font-size:1.5rem; margin:0 0 12px; } h2 { font-size:1.15rem; margin:0 0 12px; }
+label { display:block; font-weight:600; margin:12px 0 4px; }
+input[type=text],input[type=email],input[type=password] { width:100%; padding:10px; font-size:1rem; border:1px solid var(--border); border-radius:6px; background:var(--bg); color:var(--text); }
+.check { display:flex; gap:8px; align-items:flex-start; font-weight:400; }
+.check input { margin-top:5px; }
+.hint { color:var(--muted); font-size:.85rem; margin:4px 0 0; }
+.err { color:var(--err); font-size:.9rem; margin:4px 0 0; }
+.notice { border:1px solid var(--ok); color:var(--ok); border-radius:6px; padding:10px 12px; margin-bottom:16px; }
+.notice.bad { border-color:var(--err); color:var(--err); }
+button,.btn { display:inline-block; margin-top:16px; padding:10px 18px; font-size:1rem; border:0; border-radius:6px; background:var(--brand); color:#fff; cursor:pointer; text-decoration:none; }
+button.secondary { background:transparent; color:var(--brand); border:1px solid var(--brand); margin-top:0; padding:4px 10px; font-size:.85rem; }
+a { color:var(--brand); }
+table { width:100%; border-collapse:collapse; font-size:.9rem; } th,td { text-align:left; padding:8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+.table-wrap { overflow-x:auto; }
+form.inline { display:inline; }
+.tag { font-size:.75rem; border:1px solid var(--border); border-radius:4px; padding:1px 6px; color:var(--muted); }

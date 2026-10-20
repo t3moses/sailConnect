@@ -1,0 +1,7 @@
+/vendor/
+.env
+*.db
+*.db-wal
+*.db-shm
+/var/*
+!/var/.gitkeep
