@@ -9,7 +9,7 @@ Primary deployment path is the GitHub Actions workflow in `.github/workflows/dep
 ## Prerequisites
 
 - SSH key configured: `LightsailDefaultKey-ca-central-1.pem`
-- Production server: `admin@16.52.222.15`
+- Production server: `admin@16.54.93.63`
 - Local changes committed and tested
 - All tests passing locally
 
@@ -31,7 +31,7 @@ This path includes pre-deployment checks and API test gating.
 ssh-add LightsailDefaultKey-ca-central-1.pem
 
 # Start SFTP session
-sftp admin@16.52.222.15
+sftp admin@16.54.93.63
 
 # Navigate to application directory
 cd /var/www/html/sailConnect/sailFriday
@@ -57,7 +57,7 @@ bye
 
 ```bash
 # SSH into server
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 
 # Navigate to application directory
 cd /var/www/html/sailConnect/sailFriday
@@ -121,7 +121,7 @@ echo "🚀 Starting Sail Friday deployment..."
 
 # Upload files
 ssh-add LightsailDefaultKey-ca-central-1.pem
-sftp admin@16.52.222.15 <<EOF
+sftp admin@16.54.93.63 <<EOF
 cd /var/www/html/sailConnect/sailFriday
 put -r public
 put -r src
@@ -132,7 +132,7 @@ bye
 EOF
 
 # Set permissions and restart
-ssh admin@16.52.222.15 <<'EOF'
+ssh admin@16.54.93.63 <<'EOF'
 cd /var/www/html/sailConnect/sailFriday
 sudo chown -R www-data:www-data /var/www/html/sailConnect/sailFriday
 composer install --optimize-autoloader --no-dev
@@ -168,7 +168,7 @@ If deployment fails:
 ### 1. Restore Database (if migrations were run)
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday/database
 cp sailFriday.backup.YYYYMMDD_HHMMSS.db sailFriday.db
 ```
@@ -176,7 +176,7 @@ cp sailFriday.backup.YYYYMMDD_HHMMSS.db sailFriday.db
 ### 2. Revert Code (via Git)
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday
 git reset --hard <previous-commit-hash>
 composer install --no-dev
@@ -263,10 +263,10 @@ time curl https://sailfriday.sailconnect.org/api/events
 
 ```bash
 # Real-time error log
-ssh admin@16.52.222.15 'sudo tail -f /var/log/apache2/error.log'
+ssh admin@16.54.93.63 'sudo tail -f /var/log/apache2/error.log'
 
 # Real-time access log
-ssh admin@16.52.222.15 'sudo tail -f /var/log/apache2/access.log'
+ssh admin@16.54.93.63 'sudo tail -f /var/log/apache2/access.log'
 ```
 
 ## Security Notes

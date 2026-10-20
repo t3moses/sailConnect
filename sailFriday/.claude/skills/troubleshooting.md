@@ -277,7 +277,7 @@ apache2ctl -M | grep rewrite
 tail -f logs/app.log
 
 # Production
-ssh admin@16.52.222.15 'tail -f /var/www/html/sailConnect/sailFriday/logs/app-$(date +%Y-%m-%d).log'
+ssh admin@16.54.93.63 'tail -f /var/www/html/sailConnect/sailFriday/logs/app-$(date +%Y-%m-%d).log'
 ```
 
 **Then check PHP/Apache output** (PHP fatals, server-level errors):
@@ -287,7 +287,7 @@ ssh admin@16.52.222.15 'tail -f /var/www/html/sailConnect/sailFriday/logs/app-$(
 #   php -S localhost:8000 -t public
 
 # Production (Apache)
-ssh admin@16.52.222.15 'sudo tail -f /var/log/apache2/error.log'
+ssh admin@16.54.93.63 'sudo tail -f /var/log/apache2/error.log'
 ```
 
 **Common causes:**
@@ -549,7 +549,7 @@ vendor/bin/paratest
 
 **Rollback:**
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday
 git reset --hard <previous-commit-hash>
 composer install --no-dev

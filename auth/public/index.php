@@ -34,7 +34,8 @@ try {
         new Mailer($config),
         new View($root . '/views'),
     );
-    $controller->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $path);
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $controller->dispatch($method === 'HEAD' ? 'GET' : $method, $path);
 } catch (Throwable $e) {
     error_log('auth.error ' . $e);
     http_response_code(500);

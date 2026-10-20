@@ -224,7 +224,7 @@ On Windows, use PuTTY Pageant or Windows SSH Agent.
 **Always backup before deploying:**
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday/database
 sudo cp sailFriday.db backups/sailFriday.backup.$(date +%Y%m%d_%H%M%S).db
 ls -lh backups/sailFriday.backup.*
@@ -238,7 +238,7 @@ Verify the backup was created successfully before proceeding.
 Upload the following files and directories to `/var/www/html/sailConnect/sailFriday`:
 
 ```bash
-sftp admin@16.52.222.15
+sftp admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday
 
 # Upload public folder (all files)
@@ -291,7 +291,7 @@ put src/Domain/Service/SelectionService.php src/Domain/Service/SelectionService.
 SSH into the server and set ownership **before** running Composer:
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday
 
 # Code owned by the deploy user, group www-data (Apache); Composer needs write access
@@ -447,147 +447,147 @@ sudo tail -f /var/log/apache2/sailfriday-error.log
 ## Deploying the sailConnect Auth Service
 
 `auth.sailConnect.org` is the single sign-on service for every app (see [SSO.md](SSO.md) and `auth/README.md`).
-It is deployed **before** sailFriday is switched over, because sailFriday reads its database. It needs a vhost of its
-own; the existing wildcard certificate (`/etc/letsencrypt/live/sailconnect.org/`) already covers `auth.sailconnect.org`,
-and DNS is covered by the same A record or wildcard as the other apps.
+It is deployed **before** sailFriday is switched over, because sailFriday reads its database. It has a vhost of its
+own; the existing wildcard certificate (`sailconnect.org-0001`, covering `*.sailconnect.org`) is reused, and DNS already
+resolves `auth.sailconnect.org` to the server.
 
-### 1. Upload and install
+> **Status:** deployed to production on 2026-10-20 (`/var/www/auth`, vhost `auth.conf`, first platform admin seeded).
+> sailFriday has **not** yet been switched to it.
 
-The auth directory sits next to the apps, because sailFriday finds it at `../auth`:
+### 1. Directory layout on the server
+
+Apps live side by side in `/var/www` (not under `/var/www/html`, which does not exist). sailFriday finds the auth service at
+`../auth`, i.e. `/var/www/auth`:
 
 ```
-/var/www/html/sailConnect/auth          <- DocumentRoot is auth/public
-/var/www/html/sailConnect/sailFriday
-/var/www/html/sailConnect/matchRace
+/var/www/auth          <- DocumentRoot is auth/public (the sailConnect.org landing page is /var/www/sailConnect)
+/var/www/sailFriday    <- DocumentRoot is sailFriday/public
+/var/www/matchRace
 ```
 
-Upload `auth/` the same way as sailFriday (Steps 1-5 above; exclude `.env`, `vendor/`, `database/*.db*` and `var/*`), then:
+The server has no Composer and no git. Build `vendor/` on your machine and upload it:
 
 ```bash
-cd /var/www/html/sailConnect/auth
+# on your machine, in a scratch copy of auth/ (excluding .env, vendor/, *.db, var/*, tests/)
 composer install --no-dev --optimize-autoloader
-sudo mkdir -p database var
+rsync -a --delete -e "ssh -i LightsailDefaultKey-ca-central-1.pem" ./ admin@16.54.93.63:/var/www/auth/
 ```
 
-sailFriday resolves `../auth` through a Composer path package, so after deploying both, run
-`composer install --no-dev --optimize-autoloader` in `sailFriday` as well.
+`robmorgan/phinx` is a runtime dependency of `auth` so that migrations can run on the server.
 
-### 2. Configure `.env`
-
-```bash
-cp .env.example .env
-nano .env
-```
+### 2. `.env` (on the server, mode 640, group www-data)
 
 | Setting | Production value |
 |---------|------------------|
-| `APP_URL` | `https://auth.sailConnect.org` (no trailing slash) |
-| `COOKIE_DOMAIN` | `.sailConnect.org` (leading dot: the session cookie is shared by every subdomain) |
-| `ALLOWED_RETURN_HOSTS` | `sailConnect.org` (sign-in may only redirect back to this domain and its subdomains) |
-| `DB_PATH` | `/var/www/html/sailConnect/auth/database/auth.db` |
-| `CLUB_ADMIN_EMAIL` | the club administrator's address |
-| `INACTIVITY_EXPIRY_MINUTES` | e.g. `30` |
-| `TERMS_OF_USE_URL` | the terms of use page |
-| `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | real Cloudflare Turnstile keys (the example file holds Cloudflare's always-pass **test** keys; replace them) and add `auth.sailconnect.org` as a hostname in the Turnstile widget |
-| `SMTP_*`, `EMAIL_FROM` | the same SMTP account the apps use; `EMAIL_FROM` should be an address your SMTP provider has verified |
-| `SEED_ADMIN_*` | the first platform admin (needed only for the seeder; remove `SEED_ADMIN_PASSWORD` afterwards) |
+| `APP_URL` | `https://auth.sailconnect.org` (no trailing slash; `https` is what makes the cookie `Secure`) |
+| `COOKIE_DOMAIN` | `.sailconnect.org` (leading dot: shared by every subdomain) |
+| `ALLOWED_RETURN_HOSTS` | `sailconnect.org` |
+| `DB_PATH` | `/var/www/auth/database/auth.db` |
+| `CLUB_ADMIN_EMAIL` | `t3moses@gmail.com` |
+| `INACTIVITY_EXPIRY_MINUTES` / `SESSION_MAX_HOURS` | `30` / `168` |
+| `TERMS_OF_USE_URL` | not set yet (the registration form shows plain text until it is) |
+| `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | **currently Cloudflare's always-pass test keys, so the captcha is not enforced.** Replace with real keys and add `auth.sailconnect.org` to the widget's hostnames |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | `in-v3.mailjet.com` / `587` / `tls` (Mailjet's SMTP relay) |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | the Mailjet **public / private API key** (same account as sailFriday's `MJ_APIKEY_*`) |
+| `EMAIL_FROM` / `EMAIL_FROM_NAME` | `nsc-sdc@nsc.ca` / `sailConnect` (the sender Mailjet already verifies) |
 
-`APP_DEBUG=false`. The `https://` in `APP_URL` is what makes the session cookie `Secure`, so it must be correct.
+`APP_DEBUG=false`. The `SEED_ADMIN_*` settings are only used by the seeder; delete `SEED_ADMIN_PASSWORD` after seeding.
 
-### 3. Create the database and the first platform admin
+### 3. Database and first platform admin
 
 ```bash
-cd /var/www/html/sailConnect/auth
-vendor/bin/phinx migrate
-vendor/bin/phinx seed:run -s PlatformAdminSeeder
+cd /var/www/auth
+sudo -u www-data php vendor/bin/phinx migrate
+sudo -u www-data php vendor/bin/phinx seed:run -s PlatformAdminSeeder   # needs SEED_ADMIN_* in .env
+sudo sed -i '/^SEED_ADMIN_PASSWORD=/d' .env
 ```
 
-Then remove `SEED_ADMIN_PASSWORD` from `.env`.
+Run these as `www-data` so the database files get the right owner. Give the seeded admin a random password nobody sees; they
+set their own with the "Forgot your password?" link on the sign-in page.
 
 ### 4. Permissions
 
-The web-server user writes to the database (including sessions' `last_touch` from every app, and SQLite's `-wal`/`-shm`
-files), so it must own the `database/` directory:
-
 ```bash
-sudo chown -R admin:www-data /var/www/html/sailConnect/auth
-sudo chown -R www-data:www-data /var/www/html/sailConnect/auth/database /var/www/html/sailConnect/auth/var
-sudo chmod 775 /var/www/html/sailConnect/auth/database /var/www/html/sailConnect/auth/var
-sudo chmod 640 /var/www/html/sailConnect/auth/.env
-sudo chgrp www-data /var/www/html/sailConnect/auth/.env
+sudo chown -R admin:www-data /var/www/auth
+sudo chown -R www-data:www-data /var/www/auth/database /var/www/auth/var
+sudo chmod 770 /var/www/auth/database /var/www/auth/var
+sudo chmod 660 /var/www/auth/database/auth.db       # holds password hashes: not world-readable
+sudo chgrp www-data /var/www/auth/.env && sudo chmod 640 /var/www/auth/.env
 ```
 
-The sailFriday cron jobs (`bin/sync-identity.php`, `bin/notify.php`, ...) run as `www-data` in the existing setup, so they can
-open the auth database as well.
+Every app (running as `www-data`) writes `sessions.last_touch` through the verifier, so `www-data` must own the database and its
+directory (SQLite also creates `-wal` / `-shm` files there). The `admin` user must use `sudo -u www-data sqlite3 ...` to inspect it.
 
-### 5. Apache virtual hosts
+### 5. Apache
 
-**File:** `/etc/apache2/sites-available/auth.conf`
+**File:** `/etc/apache2/sites-available/auth.conf` (same layout as `sailfriday.conf`: one file with the `:80` redirect and the `:443` site)
 
 ```apache
 <VirtualHost *:80>
     ServerName auth.sailconnect.org
     Redirect permanent / https://auth.sailconnect.org/
 </VirtualHost>
-```
 
-**File:** `/etc/apache2/sites-available/auth-ssl.conf`
-
-```apache
 <VirtualHost *:443>
     ServerName auth.sailconnect.org
-    DocumentRoot /var/www/html/sailConnect/auth/public
+    DocumentRoot /var/www/auth/public
 
     SSLEngine on
-    SSLCertificateFile    /etc/letsencrypt/live/sailconnect.org/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/sailconnect.org/privkey.pem
+    SSLCertificateFile    /etc/letsencrypt/live/sailconnect.org-0001/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/sailconnect.org-0001/privkey.pem
 
-    <Directory /var/www/html/sailConnect/auth/public>
+    <Directory /var/www/auth/public>
         Options -Indexes +FollowSymLinks -MultiViews
         AllowOverride All
         Require all granted
     </Directory>
 
-    Header always set Strict-Transport-Security "max-age=31536000"
+    <IfModule mod_headers.c>
+        Header always set Strict-Transport-Security "max-age=31536000"
+    </IfModule>
 
     ErrorLog ${APACHE_LOG_DIR}/auth-error.log
     CustomLog ${APACHE_LOG_DIR}/auth-access.log combined
 </VirtualHost>
 ```
 
-(Use the certificate directory shown by `sudo certbot certificates` if it differs from the path above.)
-
 ```bash
-sudo a2ensite auth auth-ssl
-sudo apachectl configtest
-sudo systemctl reload apache2
+sudo a2ensite auth
+sudo apache2ctl configtest      # must say Syntax OK before any reload
+sudo systemctl reload apache2   # graceful; avoid restart
 ```
 
-`auth/public/.htaccess` routes everything except real files (the stylesheet) to `index.php`. `.env`, `src/`, `database/` and
-`var/` sit outside `public/` and are not web-accessible.
+Notes from the production server:
+
+- `mod_headers` and `mod_expires` are not enabled there (`a2enmod headers expires` if you want HSTS and caching); the config above is safe without them.
+- Apache's main `DocumentRoot` is `/var/www/html`. That directory had been removed, which made `apache2ctl configtest` fail (and would have made a *restart* fail). It was recreated empty (`root:root`, 755). Do not delete it.
+- Apache loads PHP 8.4 (`php8.4` module) while the CLI is PHP 8.5; both have `pdo_sqlite`, `curl`, `mbstring` and `openssl`.
 
 ### 6. Verify
 
 ```bash
-curl -sI https://auth.sailconnect.org/signin | head -3          # 200 OK
-curl -sI http://auth.sailconnect.org/ | grep -i location        # redirects to https
+curl -sI https://auth.sailconnect.org/signin | head -1                 # 200
+curl -sI http://auth.sailconnect.org/ | grep -i location               # https redirect
+curl -s -o /dev/null -w "%{http_code}\n" https://auth.sailconnect.org/.env   # 403 (not 200)
 ```
 
-In a browser: register a test account (Turnstile appears, a confirmation email arrives, the platform admins and club admin are
-notified), sign in, then open `https://sailfriday.sailconnect.org` and confirm you are already signed in. In the browser's
-developer tools the `sc_session` cookie should show `Domain: .sailconnect.org`, `Secure`, `HttpOnly`. Sign out and confirm
-sailFriday treats you as signed out. Leave the session idle for longer than `INACTIVITY_EXPIRY_MINUTES` to confirm it expires.
+In a browser: register a test account, confirm the emails arrive, sign in, then open `https://sailfriday.sailconnect.org` and
+confirm you are already signed in (after the sailFriday switch-over). The `sc_session` cookie should show `Domain: .sailconnect.org`,
+`Secure`, `HttpOnly`. Sign out and confirm sailFriday treats you as signed out. Leave a session idle longer than
+`INACTIVITY_EXPIRY_MINUTES` to confirm it expires.
 
-### 7. Switch sailFriday over
+### 7. Switch sailFriday over (not yet done)
 
-Back up both databases (Step 2 above, plus `cp auth/database/auth.db`), deploy sailFriday, run `vendor/bin/phinx migrate`,
-then migrate the users and add the identity-sync cron entry as described in [SSO.md](SSO.md#first-time-setup). Existing
-sailFriday sessions (JWTs) stop working at this point and users sign in once at the auth service.
+The sailFriday currently on the server is an older layout (`Libraries/`, a root `index.php`, `debug_jwt.php`, no cron entries), so
+the switch is a full redeploy of the current code rather than a patch. Order: back up both databases, deploy sailFriday
+(including `vendor/` built locally, with the `auth` path package), `vendor/bin/phinx migrate`, then migrate the users and add the
+identity-sync cron entry as described in [SSO.md](SSO.md#first-time-setup). Existing sailFriday sessions (JWTs) stop working at
+that point and users sign in once at the auth service.
 
 ### Backups
 
 `auth/database/auth.db` is the only copy of every user's credentials. Add it to the same backup routine as the sailFriday database
-(see [Backup Procedures](#backup-procedures)), using `sqlite3 ... ".backup ..."` rather than copying the file while WAL is active.
+(see [Backup Procedures](#backup-procedures)), using `sudo -u www-data sqlite3 ... ".backup ..."` rather than copying the file while WAL is active.
 
 ---
 
@@ -598,7 +598,7 @@ Production and dev are both plain **Debian** Lightsail instances with a hand-ins
 | | Value |
 |---|---|
 | Domains | `sailfriday.sailconnect.org` (sailFriday), `matchrace.sailconnect.org` (matchRace), `auth.sailconnect.org` (single sign-on), `sailconnect.org` (landing) |
-| Monorepo root on server | `/var/www/html/sailConnect/` (`sailFriday/`, `matchRace/`, `auth/`) |
+| App directories on server | `/var/www/sailFriday`, `/var/www/matchRace`, `/var/www/auth`, and `/var/www/sailConnect` (landing page) — **not** under `/var/www/html` as the older sections of this document assume |
 | sailFriday app root | `/var/www/html/sailConnect/sailFriday` |
 | Apache DocumentRoot | `/var/www/html/sailConnect/sailFriday/public` (auth: `.../auth/public`, matchRace: `.../matchRace/public`) |
 | Web server user/group | `www-data:www-data` (uid 33) |
@@ -618,7 +618,7 @@ Production environment variables must be configured in `.env` file.
 SSH into server:
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday
 nano .env
 ```
@@ -700,7 +700,7 @@ Save and exit (Ctrl+X, Y, Enter).
 Always backup before running migrations:
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday
 
 # 1. Backup database
@@ -745,14 +745,14 @@ mkdir -p /var/www/html/sailConnect/sailFriday/database/backups
 
 **Before deployment:**
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday/database
 sudo cp sailFriday.db backups/sailFriday.backup.$(date +%Y%m%d_%H%M%S).db
 ```
 
 **Download backup to local machine:**
 ```bash
-sftp admin@16.52.222.15
+sftp admin@16.54.93.63
 cd var/www/html/database
 get sailFriday.db
 get sailFriday.backup.*
@@ -778,7 +778,7 @@ find /var/www/html/sailConnect/sailFriday/database/backups -name "sailFriday.bac
 If you need to restore from a backup:
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday/database
 
 # List available backups
@@ -800,7 +800,7 @@ sudo systemctl restart apache2
 **Read-only queries are safe:**
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday/database
 
 # Query database
@@ -1203,7 +1203,7 @@ If deployment fails or introduces critical bugs, follow these steps to rollback.
 If the issue is in the code (not database):
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday
 
 # Option 1: Checkout previous git commit (if using git on server)
@@ -1224,7 +1224,7 @@ sudo systemctl restart apache2
 If a migration caused issues:
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday
 
 # Option 1: Rollback last migration via Phinx
@@ -1245,7 +1245,7 @@ sudo systemctl restart apache2
 If both code and database need to be rolled back:
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday
 
 # 1. Restore database

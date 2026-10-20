@@ -109,7 +109,7 @@ Prefer deployment/database operations through repository automation where possib
 ssh-add LightsailDefaultKey-ca-central-1.pem
 
 # Start SFTP session
-sftp admin@16.52.222.15
+sftp admin@16.54.93.63
 
 # Navigate and download
 cd var/www/html/database
@@ -121,7 +121,7 @@ bye
 ### Using SCP (Alternative)
 
 ```bash
-scp admin@16.52.222.15:/var/www/html/sailConnect/sailFriday/database/sailFriday.db ./database/sailFriday.prod.db
+scp admin@16.54.93.63:/var/www/html/sailConnect/sailFriday/database/sailFriday.db ./database/sailFriday.prod.db
 ```
 
 ## Seed Test Data
@@ -240,7 +240,7 @@ ls -lh database/sailFriday.db
 
 1. **Always backup first:**
    ```bash
-   ssh admin@16.52.222.15
+   ssh admin@16.54.93.63
    cd /var/www/html/sailConnect/sailFriday/database
    cp sailFriday.db sailFriday.backup.$(date +%Y%m%d_%H%M%S).db
    ```
@@ -253,7 +253,7 @@ ls -lh database/sailFriday.db
 ### Apply Production Migration
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 cd /var/www/html/sailConnect/sailFriday
 vendor/bin/phinx migrate -e production
 ```
@@ -261,7 +261,7 @@ vendor/bin/phinx migrate -e production
 ### Monitor Production Database
 
 ```bash
-ssh admin@16.52.222.15
+ssh admin@16.54.93.63
 sqlite3 /var/www/html/sailConnect/sailFriday/database/sailFriday.db "SELECT COUNT(*) FROM boats;"
 ```
 
