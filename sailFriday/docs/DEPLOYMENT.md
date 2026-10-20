@@ -485,8 +485,8 @@ rsync -a --delete -e "ssh -i LightsailDefaultKey-ca-central-1.pem" ./ admin@16.5
 | `DB_PATH` | `/var/www/auth/database/auth.db` |
 | `CLUB_ADMIN_EMAIL` | `t3moses@gmail.com` |
 | `INACTIVITY_EXPIRY_MINUTES` / `SESSION_MAX_HOURS` | `30` / `168` |
-| `TERMS_OF_USE_URL` | not set yet (the registration form shows plain text until it is) |
-| `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | **currently Cloudflare's always-pass test keys, so the captcha is not enforced.** Replace with real keys and add `auth.sailconnect.org` to the widget's hostnames |
+| `TERMS_OF_USE_URL` | `https://sailconnect.org/terms.html` (placeholder page; replace with the real terms) |
+| `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | real Cloudflare keys (installed 2026-10-20); the widget's hostnames must include `auth.sailconnect.org`. Cloudflare's always-pass test keys (`1x0000...`) must never be used in production |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | `in-v3.mailjet.com` / `587` / `tls` (Mailjet's SMTP relay) |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | the Mailjet **public / private API key** (same account as sailFriday's `MJ_APIKEY_*`) |
 | `EMAIL_FROM` / `EMAIL_FROM_NAME` | `nsc-sdc@nsc.ca` / `sailConnect` (the sender Mailjet already verifies) |
