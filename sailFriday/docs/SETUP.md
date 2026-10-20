@@ -166,10 +166,8 @@ Edit `.env` with your preferred text editor and add the following configuration:
 # Database
 DB_PATH=database/sailFriday.db
 
-# JWT Authentication (REQUIRED)
-# Must be at least 32 characters long
-JWT_SECRET=your-secret-key-at-least-32-characters-long-change-this-in-production
-JWT_EXPIRATION_MINUTES=60
+# sailConnect single sign-on (optional; defaults to ../auth). See docs/SSO.md
+#AUTH_DIR=/path/to/sailConnect/auth
 
 # Email - Local Development (APP_ENV=development or local)
 # Emails are captured by MailHog (https://github.com/mailhog/MailHog) instead of being delivered.
@@ -202,7 +200,7 @@ CORS_ALLOWED_HEADERS=Content-Type,Authorization
 
 **Important Notes:**
 
-- **JWT_SECRET** is required and must be at least 32 characters
+- Authentication is provided by the sailConnect auth service (`../auth`); set it up first (see [SSO.md](SSO.md))
 - For production, set `APP_DEBUG=false` and use strong, unique credentials
 - If you don't create a `.env` file, the application will use default values from `config/config.php`
 
@@ -352,8 +350,8 @@ You should see the Sail Friday frontend application (or a placeholder if the fro
 **Problem:** "Database not found" error
 - **Solution:** Run migrations: `vendor/bin/phinx migrate`
 
-**Problem:** "JWT_SECRET not configured" error
-- **Solution:** Set `JWT_SECRET` in your `.env` file (minimum 32 characters)
+**Problem:** Every request returns 401 or the API cannot find the session
+- **Solution:** Check that the auth service is installed (`../auth`, `composer install`, migrated) and that `AUTH_DIR` points to it (see [SSO.md](SSO.md))
 
 ---
 
@@ -383,14 +381,8 @@ The backend REST API is available at `/api`. All endpoints are documented in the
 
 Example API call from JavaScript:
 ```javascript
-const token = localStorage.getItem('jaws_token');
-
-fetch('/api/users/me', {
-    headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-    }
-})
+// The sailConnect session cookie is sent automatically (see SSO.md)
+fetch('/api/users/me', { credentials: 'same-origin' })
 .then(response => response.json())
 .then(data => console.log(data));
 ```

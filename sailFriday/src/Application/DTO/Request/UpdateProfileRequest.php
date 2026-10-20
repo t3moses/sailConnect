@@ -44,18 +44,12 @@ final readonly class UpdateProfileRequest
     {
         $errors = [];
 
-        // Validate email if provided
-        if ($this->email !== null && !empty($this->email)) {
-            if (!filter_var($this->email, FILTER_VALIDATE_EMAIL)) {
-                $errors['email'] = 'Invalid email format';
-            }
+        // Email and password belong to the sailConnect account, not to Sail Friday
+        if (!empty($this->email)) {
+            $errors['email'] = 'Email address is managed in your sailConnect account';
         }
-
-        // Validate password if provided
-        if ($this->password !== null && !empty($this->password)) {
-            if (strlen($this->password) < 8) {
-                $errors['password'] = 'Password must be at least 8 characters';
-            }
+        if (!empty($this->password)) {
+            $errors['password'] = 'Password is managed in your sailConnect account';
         }
 
         // Crew and boat profile validation is handled by respective use cases

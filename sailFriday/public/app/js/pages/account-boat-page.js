@@ -3,12 +3,20 @@
  * Handles boat owner registration form
  */
 
-import { isSignedIn, register } from '../authService.js';
-import { validatePassword } from '../passwordValidator.js';
+import { getCurrentUser, getIdentity, register } from '../authService.js';
+import { hasToken } from '../tokenService.js';
+import { registerUrl, profileUrl } from '../ssoService.js';
+import { renderIdentitySummary } from '../enrollmentService.js';
 
-// Check if already signed in
-if (await isSignedIn()) {
+// Sign-up (name, email, password, membership) happens at sailConnect. Send visitors there first,
+// then they come back here to choose how they take part in Sail Friday.
+if (!hasToken()) {
+    window.location.href = registerUrl();
+} else if (await getCurrentUser()) {
+    // Already enrolled in Sail Friday
     window.location.href = 'dashboard.html';
+} else {
+    await renderIdentitySummary(await getIdentity(), profileUrl());
 }
 
 document.querySelector('form').addEventListener('submit', async function(e) {
@@ -17,37 +25,12 @@ document.querySelector('form').addEventListener('submit', async function(e) {
     const submitButton = this.querySelector('[type="submit"]');
     const originalLabel = submitButton.textContent;
     submitButton.disabled = true;
-    submitButton.textContent = 'Creating account...';
-
-    // Get password values
-    const password = document.getElementById('password').value;
-    const confirmPassword = document.getElementById('confirm_password').value;
-
-    // Validate passwords match
-    if (password !== confirmPassword) {
-        submitButton.disabled = false;
-        submitButton.textContent = originalLabel;
-        alert('Passwords do not match! Please try again.');
-        return;
-    }
-
-    // Validate password requirements
-    const validation = validatePassword(password);
-    if (!validation.isValid) {
-        submitButton.disabled = false;
-        submitButton.textContent = originalLabel;
-        alert(validation.error);
-        return;
-    }
+    submitButton.textContent = 'Saving...';
 
     // Create user data object
     const userData = {
         accountType: 'boat_owner',
-        email: document.getElementById('email').value,
-        password: password,
         profile: {
-            ownerFirstName: document.getElementById('first_name').value,
-            ownerLastName: document.getElementById('last_name').value,
             ownerMobile: document.getElementById('phone').value,
             displayName: document.getElementById('boat_name').value,
             minBerths: document.getElementById('min_crew').value,
@@ -58,7 +41,7 @@ document.querySelector('form').addEventListener('submit', async function(e) {
         }
     };
 
-    // Register user (creates account and signs in automatically)
+    // Enroll the signed-in sailConnect user as a boat owner
     const result = await register(userData);
 
     if (result.success) {

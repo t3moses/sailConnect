@@ -79,7 +79,7 @@ Here's how an availability update flows through the layers:
 
 2. Presentation Layer (Controller)
    - Extract JSON from HTTP body
-   - Extract auth data from JWT token
+   - Resolve the signed-in user from the sailConnect session cookie (AuthSessionMiddleware)
    - Create UpdateAvailabilityRequest DTO
    - Auto-detect user role (boat/crew/flex)
    - Call appropriate use case(s)
@@ -1053,14 +1053,10 @@ composer dump-autoload
 - Ensure test migrations are applied
 - Check `setUp()` method applies latest schema
 
-**Issue: JWT token expired**
+**Issue: Session expired (401)**
 
-**Solution:** Get a new token
-```bash
-curl -X POST "http://localhost:8000/api/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"your@email.com","password":"your_password"}'
-```
+**Solution:** Sign in again at the sailConnect auth service (default `http://localhost:8001/signin` in development),
+then repeat the request with the new `sc_session` cookie. See [SSO.md](SSO.md).
 
 **Issue: Port already in use**
 

@@ -4,7 +4,8 @@
  */
 
 import { API_CONFIG, buildApiUrl } from './config.js';
-import { getToken, clearToken } from './tokenService.js';
+import { clearToken } from './tokenService.js';
+import { redirectToSignIn } from './ssoService.js';
 import { showInfo } from './toastService.js';
 
 /**
@@ -25,37 +26,36 @@ function sleep(ms) {
  */
 async function makeRequest(url, options = {}, retryCount = 0) {
     try {
-        // Get JWT token for authentication
-        const token = getToken();
-
         const headers = {
             'Content-Type': 'application/json',
             ...options.headers
         };
 
-        // Add Authorization header if token exists
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
-
+        // Authentication is the shared sailConnect session cookie, sent automatically
         const response = await fetch(url, {
             ...options,
             headers,
+            credentials: 'same-origin',
             signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
         });
 
-        // Handle 401 Unauthorized - session expired
+        // Handle 401 Unauthorized - not signed in, or the sailConnect session expired
         if (response.status === 401) {
             clearToken();
-
-            // Only redirect if not already on signin page
-            // If on signin page, let the login form handle the error display
-            const currentPage = window.location.pathname.split('/').pop();
-            if (currentPage !== 'signin.html') {
-                window.location.href = 'signin.html?message=session_expired';
-            }
-
+            redirectToSignIn();
             throw new Error('Session expired. Please sign in again.');
+        }
+
+        // Handle 403 enrollment_required - signed in to sailConnect but no Sail Friday account yet
+        if (response.status === 403) {
+            const body = await response.clone().json().catch(() => null);
+            if (body?.details?.code === 'enrollment_required') {
+                const currentPage = window.location.pathname.split('/').pop();
+                if (!currentPage.startsWith('account')) {
+                    window.location.href = 'account.html';
+                }
+                throw new Error(body.error || 'Complete your Sail Friday registration to continue.');
+            }
         }
 
         // Handle 409 Conflict - concurrent update in progress (retry with exponential backoff)
@@ -86,7 +86,7 @@ async function makeRequest(url, options = {}, retryCount = 0) {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+            throw new Error(errorData.message || errorData.error || `HTTP ${response.status}: ${response.statusText}`);
         }
 
         if (response.status === 204 || response.status === 205) {
@@ -298,34 +298,25 @@ export async function clearSession() {
 // ============================================
 
 /**
- * User login
- * @param {string} email - User email
- * @param {string} password - User password (plain text)
- * @returns {Promise<Object>} { success, token, user }
- */
-export async function login(email, password) {
-    return await post(API_CONFIG.ENDPOINTS.AUTH_LOGIN, { email, password });
-}
-
-/**
- * User registration
- * @param {Object} userData - { accountType, email, password, profile }
- * @returns {Promise<Object>} { success, token, user }
+ * Enroll the signed-in sailConnect user in Sail Friday
+ * @param {Object} userData - { accountType, profile }
+ * @returns {Promise<Object>} { success, data: { user } }
  */
 export async function register(userData) {
     return await post(API_CONFIG.ENDPOINTS.AUTH_REGISTER, userData);
 }
 
 /**
- * User logout
- * @returns {Promise<Object>} { success }
+ * Get the signed-in sailConnect identity (works before enrollment)
+ * @returns {Promise<Object|null>} { email, firstName, lastName, displayName, isMember, membershipNumber }
  */
-export async function logout() {
-    return await post(API_CONFIG.ENDPOINTS.AUTH_LOGOUT, {});
+export async function getIdentity() {
+    const response = await get(API_CONFIG.ENDPOINTS.AUTH_IDENTITY);
+    return response.data?.identity || null;
 }
 
 /**
- * Get current session (validate token)
+ * Get current session (validate session)
  * @returns {Promise<Object|null>} { user } or null
  */
 export async function getAuthSession() {
@@ -338,25 +329,6 @@ export async function getAuthSession() {
         }
         throw error;
     }
-}
-
-/**
- * Request a password reset email
- * @param {string} email - User email
- * @returns {Promise<Object>}
- */
-export async function forgotPassword(email) {
-    return await post(API_CONFIG.ENDPOINTS.AUTH_FORGOT_PASSWORD, { email });
-}
-
-/**
- * Reset password using token from email
- * @param {string} token - Reset token from email link
- * @param {string} password - New password
- * @returns {Promise<Object>}
- */
-export async function resetPassword(token, password) {
-    return await post(API_CONFIG.ENDPOINTS.AUTH_RESET_PASSWORD, { token, password });
 }
 
 /**

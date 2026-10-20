@@ -13,8 +13,6 @@ namespace App\Application\DTO\Request;
 final readonly class RegisterRequest
 {
     public function __construct(
-        public string $email,
-        public string $password,
         public string $accountType,
         public ?array $profile = null,
     ) {
@@ -29,35 +27,42 @@ final readonly class RegisterRequest
     public static function fromArray(array $data): self
     {
         return new self(
-            email: $data['email'] ?? '',
-            password: $data['password'] ?? '',
             accountType: $data['accountType'] ?? '',
             profile: $data['profile'] ?? null,
         );
     }
 
     /**
+     * Copy with names and membership taken from the sailConnect identity
+     *
+     * @param array $identity first_name, last_name, is_member, membership_number
+     * @return self
+     */
+    public function withIdentity(array $identity): self
+    {
+        $profile = $this->profile ?? [];
+        if ($this->accountType === 'crew') {
+            $profile['firstName'] = $identity['first_name'];
+            $profile['lastName'] = $identity['last_name'];
+            $profile['membershipNumber'] = !empty($identity['is_member']) ? $identity['membership_number'] : null;
+        } else {
+            $profile['ownerFirstName'] = $identity['first_name'];
+            $profile['ownerLastName'] = $identity['last_name'];
+        }
+
+        return new self($this->accountType, $profile);
+    }
+
+    /**
      * Validate the request
+     *
+     * Names and membership are not validated here: they come from the sailConnect identity.
      *
      * @return array Validation errors (empty if valid)
      */
     public function validate(): array
     {
         $errors = [];
-
-        // Validate email
-        if (empty($this->email)) {
-            $errors['email'] = 'Email is required';
-        } elseif (!filter_var($this->email, FILTER_VALIDATE_EMAIL)) {
-            $errors['email'] = 'Invalid email format';
-        }
-
-        // Validate password
-        if (empty($this->password)) {
-            $errors['password'] = 'Password is required';
-        } elseif (strlen($this->password) < 8) {
-            $errors['password'] = 'Password must be at least 8 characters';
-        }
 
         // Validate account type
         if (empty($this->accountType)) {
@@ -67,39 +72,11 @@ final readonly class RegisterRequest
         }
 
         // Validate profile
-        if (!is_array($this->profile) || empty($this->profile)) {
+        if (!is_array($this->profile)) {
             $errors['profile'] = 'Profile data is required';
-        } else {
-            // Validate based on account type
-            if ($this->accountType === 'crew') {
-                $errors = array_merge($errors, $this->validateCrewProfile($this->profile));
-            } elseif ($this->accountType === 'boat_owner') {
-                $errors = array_merge($errors, $this->validateBoatProfile($this->profile));
-            }
+        } elseif ($this->accountType === 'boat_owner') {
+            $errors = array_merge($errors, $this->validateBoatProfile($this->profile));
         }
-
-        return $errors;
-    }
-
-    /**
-     * Validate crew profile data
-     *
-     * @param array $profile Profile data
-     * @return array Validation errors
-     */
-    private function validateCrewProfile(array $profile): array
-    {
-        $errors = [];
-
-        if (empty($profile['firstName'])) {
-            $errors['profile.firstName'] = 'First name is required';
-        }
-
-        if (empty($profile['lastName'])) {
-            $errors['profile.lastName'] = 'Last name is required';
-        }
-
-        // Optional fields: displayName, mobile, skill, membershipNumber, socialPreference, experience, partnerKey
 
         return $errors;
     }
@@ -113,14 +90,6 @@ final readonly class RegisterRequest
     private function validateBoatProfile(array $profile): array
     {
         $errors = [];
-
-        if (empty($profile['ownerFirstName'])) {
-            $errors['profile.ownerFirstName'] = 'Owner first name is required';
-        }
-
-        if (empty($profile['ownerLastName'])) {
-            $errors['profile.ownerLastName'] = 'Owner last name is required';
-        }
 
         if (!isset($profile['minBerths']) || !is_numeric($profile['minBerths'])) {
             $errors['profile.minBerths'] = 'Minimum berths is required and must be a number';

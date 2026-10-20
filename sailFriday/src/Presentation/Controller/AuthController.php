@@ -4,74 +4,68 @@ declare(strict_types=1);
 
 namespace App\Presentation\Controller;
 
-use App\Application\DTO\Request\ForgotPasswordRequest;
-use App\Application\DTO\Request\LoginRequest;
 use App\Application\DTO\Request\RegisterRequest;
-use App\Application\DTO\Request\ResetPasswordRequest;
-use App\Application\UseCase\Auth\ForgotPasswordUseCase;
 use App\Application\UseCase\Auth\GetSessionUseCase;
-use App\Application\UseCase\Auth\LoginUseCase;
-use App\Application\UseCase\Auth\LogoutUseCase;
 use App\Application\UseCase\Auth\RegisterUseCase;
-use App\Application\UseCase\Auth\ResetPasswordUseCase;
 use App\Presentation\Response\JsonResponse;
 
 /**
  * Authentication Controller
  *
- * Handles user authentication endpoints:
- * - POST /api/auth/register - Register new user
- * - POST /api/auth/login - Login with email/password
+ * Sign-in, sign-out, password reset and credentials are handled by the sailConnect auth service.
+ * This controller only covers the Sail Friday side of a signed-in sailConnect user:
+ * - POST /api/auth/register - Enroll the signed-in sailConnect user as crew or boat owner
+ * - GET /api/auth/identity - Get the signed-in sailConnect identity
  * - GET /api/auth/session - Get current session info
- * - POST /api/auth/logout - Logout current user
- * - POST /api/auth/forgot-password - Request password reset email
- * - POST /api/auth/reset-password - Reset password with token
  */
 class AuthController
 {
     public function __construct(
         private RegisterUseCase $registerUseCase,
-        private LoginUseCase $loginUseCase,
         private GetSessionUseCase $getSessionUseCase,
-        private LogoutUseCase $logoutUseCase,
-        private ForgotPasswordUseCase $forgotPasswordUseCase,
-        private ResetPasswordUseCase $resetPasswordUseCase,
     ) {
     }
 
     /**
-     * Register new user
+     * Enroll the signed-in sailConnect user in Sail Friday
      *
      * POST /api/auth/register
      *
-     * @param array $body Request body
+     * @param array $body Request body: accountType, profile
+     * @param array $auth sailConnect identity (route auth mode "identity")
      * @return JsonResponse
      */
-    public function register(array $body): JsonResponse
+    public function register(array $body, array $auth): JsonResponse
     {
         $request = RegisterRequest::fromArray($body);
-        $response = $this->registerUseCase->execute($request);
+        $user = $this->registerUseCase->execute($request, $auth);
 
-        $data = $response->toArray();
-        $data['message'] = 'Registration successful';
-
-        return JsonResponse::success($data, 201);
+        return JsonResponse::success([
+            'user' => $user->toArray(),
+            'message' => 'Registration successful',
+        ], 201);
     }
 
     /**
-     * Login with email and password
+     * Get the signed-in sailConnect identity (available before enrollment)
      *
-     * POST /api/auth/login
+     * GET /api/auth/identity
      *
-     * @param array $body Request body
+     * @param array $auth sailConnect identity (route auth mode "identity")
      * @return JsonResponse
      */
-    public function login(array $body): JsonResponse
+    public function getIdentity(array $auth): JsonResponse
     {
-        $request = LoginRequest::fromArray($body);
-        $response = $this->loginUseCase->execute($request);
-
-        return JsonResponse::success($response->toArray());
+        return JsonResponse::success([
+            'identity' => [
+                'email' => $auth['email_address'],
+                'firstName' => $auth['first_name'],
+                'lastName' => $auth['last_name'],
+                'displayName' => $auth['display_name'],
+                'isMember' => (bool)$auth['is_member'],
+                'membershipNumber' => $auth['membership_number'],
+            ],
+        ]);
     }
 
     /**
@@ -79,7 +73,7 @@ class AuthController
      *
      * GET /api/auth/session
      *
-     * @param array $auth Authentication context from JWT middleware
+     * @param array $auth Authentication context from the session middleware
      * @return JsonResponse
      */
     public function getSession(array $auth): JsonResponse
@@ -88,64 +82,6 @@ class AuthController
 
         return JsonResponse::success([
             'user' => $response->toArray(),
-        ]);
-    }
-
-    /**
-     * Logout current user
-     *
-     * POST /api/auth/logout
-     *
-     * Updates the user's last_logout timestamp for audit trail.
-     * Note: JWT remains technically valid until expiration. Client must
-     * delete the token from storage to complete logout.
-     *
-     * @param array $auth Authentication context from JWT middleware
-     * @return JsonResponse
-     */
-    public function logout(array $auth): JsonResponse
-    {
-        $this->logoutUseCase->execute($auth['user_id']);
-
-        return JsonResponse::success([
-            'message' => 'Logout successful. Please delete your token.',
-        ]);
-    }
-
-    /**
-     * Request a password reset email
-     *
-     * POST /api/auth/forgot-password
-     *
-     * Always returns 200 regardless of whether the email is registered
-     * to prevent email enumeration attacks.
-     *
-     * @param array $body Request body
-     * @return JsonResponse
-     */
-    public function forgotPassword(array $body): JsonResponse
-    {
-        $this->forgotPasswordUseCase->execute(ForgotPasswordRequest::fromArray($body));
-
-        return JsonResponse::success([
-            'message' => 'If that email is registered, a reset link has been sent.',
-        ]);
-    }
-
-    /**
-     * Reset password using a valid token
-     *
-     * POST /api/auth/reset-password
-     *
-     * @param array $body Request body
-     * @return JsonResponse
-     */
-    public function resetPassword(array $body): JsonResponse
-    {
-        $this->resetPasswordUseCase->execute(ResetPasswordRequest::fromArray($body));
-
-        return JsonResponse::success([
-            'message' => 'Password has been reset successfully.',
         ]);
     }
 }

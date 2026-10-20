@@ -35,7 +35,7 @@ Sail Friday is a PHP REST API for Nepean Sailing Club's Sail Friday program. Man
 
 **Architecture:** Clean Architecture (4 layers: Domain, Application, Infrastructure, Presentation)
 **Database:** SQLite with Phinx migrations
-**API Style:** REST/JSON with JWT authentication
+**API Style:** REST/JSON; authentication is the shared sailConnect single-sign-on session cookie (auth service in `../auth`, see `docs/SSO.md`)
 
 ## Development Commands
 
@@ -77,7 +77,7 @@ Dependencies flow inward only: `Presentation → Infrastructure → Application 
 Key use cases:
 - `Season/ProcessSeasonUpdateUseCase.php` ⚠️ MAIN PIPELINE — runs after every user action
 - `Season/GenerateFlotillaUseCase.php`
-- `Auth/` — Login, Register, Logout, GetSession
+- `Auth/` — Register (enrolls a signed-in sailConnect user), GetSession, SyncIdentity. Credentials, sign-in/out and password reset live in `../auth`
 - `User/` — GetProfile, AddProfile, UpdateProfile
 - `Boat/UpdateBoatAvailabilityUseCase.php`, `Crew/UpdateCrewAvailabilityUseCase.php`
 - `Event/`, `Flotilla/` — CRUD/query use cases
@@ -93,12 +93,12 @@ Key use cases:
 ### Layer 3: Infrastructure (`src/Infrastructure/`) — External adapters
 
 - `Persistence/SQLite/` — `BoatRepository`, `CrewRepository`, `EventRepository`, `SeasonRepository`, `UserRepository`, `Connection`
-- `Service/` — `PhpMailerEmailService`, `AwsSesEmailService`, `MailjetEmailService`, `EmailTemplateService`, `ICalendarService`, `SystemTimeService`, `JwtTokenService`, `PhpPasswordService`, `DatabaseTransactionService`
+- `Service/` — `PhpMailerEmailService`, `AwsSesEmailService`, `MailjetEmailService`, `EmailTemplateService`, `ICalendarService`, `SystemTimeService`, `DatabaseTransactionService`
 
 ### Layer 4: Presentation (`src/Presentation/`) — HTTP/REST
 
 - **Controllers:** `AuthController`, `UserController`, `EventController`, `AvailabilityController`, `AssignmentController`, `AdminController`
-- **Middleware:** `JwtAuthMiddleware`, `ErrorHandlerMiddleware`, `CorsMiddleware`
+- **Middleware:** `AuthSessionMiddleware` (sailConnect session -> local user), `ErrorHandlerMiddleware`, `CorsMiddleware`
 - **Router:** `Router.php` (pattern matching with parameter extraction)
 
 ## Season Update Pipeline
@@ -126,7 +126,7 @@ Key use cases:
 8. `crew_whitelist` — crew preferences for specific boats
 9. `season_config` — singleton config (dates, times, blackout windows)
 10. `flotillas` — JSON assignments
-11. `users` — authentication credentials (email, password_hash, is_admin, boat_key, crew_key)
+11. `users` — Sail Friday account linked to a sailConnect identity (`auth_user_id`); email, account_type, is_admin. `password_hash` is unused
 12. `cron_notifications` — idempotent email tracking, UNIQUE(event_id, type)
 13. `no_shows` — one row per (crew, event) no-show, UNIQUE(crew_id, event_id); source of truth for commitment_rank (see Ranking System)
 
@@ -165,15 +165,14 @@ For each rule: find highest-loss crew → find best-grad swap → swap if improv
 | GET | /api/events | EventController::getAll |
 | GET | /api/events/{id} | EventController::getOne |
 | GET | /api/flotillas | EventController::getAllFlotillas |
-| POST | /api/auth/register | AuthController::register |
-| POST | /api/auth/login | AuthController::login |
+| GET | /api/auth/identity | AuthController::getIdentity (any signed-in sailConnect user) |
+| POST | /api/auth/register | AuthController::register (any signed-in sailConnect user; enrolls as crew/boat owner) |
 
-### Authenticated (`Authorization: Bearer {token}`)
+### Authenticated (sailConnect session cookie `sc_session`)
 
 | Method | Path | Controller |
 |--------|------|------------|
 | GET | /api/auth/session | AuthController::getSession |
-| POST | /api/auth/logout | AuthController::logout |
 | GET | /api/users/me | UserController::getProfile |
 | POST | /api/users/me | UserController::addProfile |
 | PATCH | /api/users/me | UserController::updateProfile |
@@ -237,10 +236,9 @@ For each rule: find highest-loss crew → find best-grad swap → swap if improv
 ## Configuration
 
 **Key env vars:**
-- `JWT_SECRET` — 32+ chars, required
+- `AUTH_DIR` — sailConnect auth service directory (default `../auth`)
 - `DB_PATH` — default: `database/sailFriday.db`
 - `APP_ENV` — production/development
-- `JWT_EXPIRATION_MINUTES` — default: 60
 - `SMTP_*` — email settings
 - `CORS_ALLOWED_ORIGINS` — comma-separated origins
 

@@ -3,6 +3,12 @@
     "description": "Sail Friday Program Management System",
     "license": "proprietary",
     "type": "project",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../auth"
+        }
+    ],
     "require": {
         "php": "^8.1",
         "ext-pdo": "*",
@@ -12,6 +18,7 @@
         "monolog/monolog": "^3.0",
         "phpmailer/phpmailer": "^7.0",
         "robmorgan/phinx": "^0.16",
+        "sailconnect/auth": "*@dev",
         "vlucas/phpdotenv": "^5.6"
     },
     "require-dev": {

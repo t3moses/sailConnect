@@ -26,6 +26,7 @@ class User
         private ?\DateTimeImmutable $lastLogout = null,
         private ?\DateTimeImmutable $createdAt = null,
         private ?\DateTimeImmutable $updatedAt = null,
+        private ?string $authUserId = null,
     ) {
         $this->validateEmail($email);
         $this->validateAccountType($accountType);
@@ -55,6 +56,22 @@ class User
             throw new \RuntimeException('User ID is already set');
         }
         $this->id = $id;
+    }
+
+    /**
+     * Get the sailConnect (auth service) user ID this account is linked to
+     */
+    public function getAuthUserId(): ?string
+    {
+        return $this->authUserId;
+    }
+
+    /**
+     * Link this account to a sailConnect identity
+     */
+    public function setAuthUserId(?string $authUserId): void
+    {
+        $this->authUserId = $authUserId;
     }
 
     /**

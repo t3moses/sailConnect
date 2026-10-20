@@ -1,14 +1,22 @@
 /**
  * Crew Registration Page Module
- * Handles crew member registration form
+ * Handles crew member registration form (name, email and membership come from sailConnect)
  */
 
-import { isSignedIn, register } from '../authService.js';
-import { validatePassword } from '../passwordValidator.js';
+import { getCurrentUser, getIdentity, register } from '../authService.js';
+import { hasToken } from '../tokenService.js';
+import { registerUrl, profileUrl } from '../ssoService.js';
+import { renderIdentitySummary } from '../enrollmentService.js';
 
-// Check if already signed in
-if (await isSignedIn()) {
+// Sign-up (name, email, password, membership) happens at sailConnect. Send visitors there first,
+// then they come back here to choose how they take part in Sail Friday.
+if (!hasToken()) {
+    window.location.href = registerUrl();
+} else if (await getCurrentUser()) {
+    // Already enrolled in Sail Friday
     window.location.href = 'dashboard.html';
+} else {
+    await renderIdentitySummary(await getIdentity(), profileUrl());
 }
 
 // Toggle mobile field visibility when WhatsApp checkbox changes
@@ -33,28 +41,7 @@ document.querySelector('form').addEventListener('submit', async function(e) {
     const submitButton = this.querySelector('[type="submit"]');
     const originalLabel = submitButton.textContent;
     submitButton.disabled = true;
-    submitButton.textContent = 'Creating account...';
-
-    // Get password values
-    const password = document.getElementById('password').value;
-    const confirmPassword = document.getElementById('confirm_password').value;
-
-    // Validate passwords match
-    if (password !== confirmPassword) {
-        submitButton.disabled = false;
-        submitButton.textContent = originalLabel;
-        alert('Passwords do not match! Please try again.');
-        return;
-    }
-
-    // Validate password requirements
-    const validation = validatePassword(password);
-    if (!validation.isValid) {
-        submitButton.disabled = false;
-        submitButton.textContent = originalLabel;
-        alert(validation.error);
-        return;
-    }
+    submitButton.textContent = 'Saving...';
 
     // Validate mobile is provided when WhatsApp is checked
     const wantsWhatsapp = whatsappCheckbox.checked;
@@ -70,12 +57,7 @@ document.querySelector('form').addEventListener('submit', async function(e) {
     // Create user data object
     const userData = {
         accountType: 'crew',
-        email: document.getElementById('email').value,
-        password: password,
         profile: {
-            firstName: document.getElementById('first_name').value,
-            lastName: document.getElementById('last_name').value,
-            membershipNumber: document.getElementById('membership_number').value,
             skill: parseInt(document.getElementById('skill').value, 10),
             experience: document.getElementById('experience').value.trim() || undefined,
             socialPreference: wantsWhatsapp,
@@ -83,7 +65,7 @@ document.querySelector('form').addEventListener('submit', async function(e) {
         }
     };
 
-    // Register user (creates account and signs in automatically)
+    // Enroll the signed-in sailConnect user as crew
     const result = await register(userData);
 
     if (result.success) {

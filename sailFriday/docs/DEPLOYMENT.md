@@ -106,12 +106,7 @@ sudo systemctl restart apache2
 
 - `AllowOverride All` is **required** for `.htaccess` support (Debian's default is `None` outside the stock `/var/www/` block).
 - `mod_rewrite` must be enabled (`a2enmod rewrite`) or every route except `/` will 404.
-- The `.htaccess` file in `public/` contains **critical Authorization header forwarding** for JWT authentication:
-  ```apache
-  RewriteCond %{HTTP:Authorization} .
-  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-  ```
-  Without this directive, JWT authentication will fail in production.
+- Authentication is the shared sailConnect session cookie (`sc_session`, set on `.sailConnect.org` by the auth service), so no Authorization header forwarding is needed. The auth service must be deployed first and its database must be readable and writable by the web-server user. See [SSO.md](SSO.md).
 - The frontend and API use root-relative URLs (`/api/...`, `/js/...`, `/app/...`), so `sailFriday` needs its **own virtual host** (its own domain or subdomain, or a dedicated port). It cannot be served from a subpath such as `/sailConnect/sailFriday/`. `matchRace` and `auth` get their own vhosts in the same way. Keep `000-default` enabled only if something else needs it; otherwise name-based vhosts are selected by `ServerName`.
 - Apache logs are in `/var/log/apache2/` (`sailfriday-error.log`, `sailfriday-access.log`, plus the global `error.log`).
 
@@ -276,7 +271,7 @@ bye
 
 | Path | Contents | Required? |
 |------|----------|-----------|
-| `public/` | index.php, .htaccess, debug_jwt.php, app/, debug.html | Yes |
+| `public/` | index.php, .htaccess, app/, debug.html | Yes |
 | `src/` | Application source code (Domain, Application, Infrastructure, Presentation) | Yes |
 | `config/` | config.php, container.php, routes.php | Yes |
 | `composer.json` | Dependency manifest | Yes |
@@ -395,7 +390,7 @@ If `.env` doesn't exist or needs updates, see [Environment Configuration](#envir
 
 **Critical environment variables:**
 - `DB_PATH=/var/www/html/sailConnect/sailFriday/database/sailFriday.db`
-- `JWT_SECRET` (must be at least 32 characters)
+- The sailConnect auth service installed at `../auth` (or `AUTH_DIR`), migrated, with `COOKIE_DOMAIN=.sailConnect.org` (see [SSO.md](SSO.md))
 - `APP_DEBUG=false` (never true in production)
 
 #### Step 9: Restart Apache
@@ -486,9 +481,8 @@ Add the following configuration:
 # Database
 DB_PATH=/var/www/html/sailConnect/sailFriday/database/sailFriday.db
 
-# JWT Authentication (REQUIRED - CHANGE THIS!)
-JWT_SECRET=your-production-secret-key-at-least-32-characters-long-must-be-different-from-dev
-JWT_EXPIRATION_MINUTES=60
+# sailConnect single sign-on (defaults to ../auth)
+#AUTH_DIR=/var/www/html/sailConnect/auth
 
 # Mailjet Email API
 MJ_APIKEY_PUBLIC=your_mailjet_public_api_key
@@ -514,11 +508,10 @@ Save and exit (Ctrl+X, Y, Enter).
 
 **Critical Security Settings:**
 
-1. **JWT_SECRET**:
-   - Must be at least 32 characters
-   - Must be different from development secret
-   - Use a cryptographically secure random string
-   - Generate with: `openssl rand -base64 32`
+1. **Session cookie / auth service**:
+   - Serve the auth service over HTTPS only (the cookie is `Secure`)
+   - `COOKIE_DOMAIN` in the auth `.env` must be the parent domain of all applications
+   - Restrict `auth/.env` and `auth/database/` to the web-server user
 
 2. **APP_DEBUG**:
    - Must be `false` in production
@@ -1206,33 +1199,27 @@ sudo chmod 775 /var/www/html/sailConnect/sailFriday/database
 cat /etc/cron.d/sailfriday-notify   # user column must be www-data
 ```
 
-#### Issue: "JWT token invalid" after deployment
+#### Issue: Every request returns 401 after deployment
 
-**Cause:** JWT_SECRET changed or token format changed
+**Cause:** The sailConnect session cookie is not reaching the application, or the application cannot read the auth database
 
 **Solution:**
 
-1. Verify `JWT_SECRET` in `.env` hasn't changed
-2. If it changed, all users need to login again to get new tokens
-3. Clear any cached tokens on frontend
+1. Confirm the cookie `sc_session` is set for `.sailConnect.org` after signing in at the auth service (browser developer tools)
+2. Confirm `COOKIE_DOMAIN` in `auth/.env` is the parent domain and `APP_URL` there is `https://auth...`
+3. Confirm the web-server user can read and write `auth/database/auth.db` and its directory
+4. Confirm `AUTH_DIR` (or `../auth`) points at the auth service and `composer install` was run in both projects
 
 #### Issue: "Authentication not working after deployment"
 
-**Cause:** Authorization header not being forwarded to PHP, or JWT configuration issues
+**Cause:** Usually the session cookie or the auth service configuration
 
 **Solution:**
 
 1. Visit `https://sailfriday.sailconnect.org/app/debug.html` to diagnose the issue
-2. Check **"Token Present"** status - should show if authentication token exists
-3. Check **"API Connection"** status - tests live connectivity to the API
-4. Verify Authorization header forwarding in `.htaccess`:
-   ```apache
-   RewriteCond %{HTTP:Authorization} .
-   RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-   ```
-5. If the header forwarding rule is missing, JWT authentication will fail silently
-6. Ensure `AllowOverride All` is set in the Apache virtual host configuration
-7. Restart Apache after any `.htaccess` changes:
+2. Check the signed-in marker status (the `sc_signed_in` cookie) and **"API Connection"**
+3. Work through the 401 checklist above
+4. Ensure `AllowOverride All` is set in the Apache virtual host configuration and restart Apache after any `.htaccess` changes:
    ```bash
    sudo systemctl restart apache2
    ```

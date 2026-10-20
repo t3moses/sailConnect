@@ -3,7 +3,7 @@
  * Displays API connection status and authentication state
  */
 
-import { hasToken } from '../tokenService.js';
+import { hasToken, clearToken } from '../tokenService.js';
 import { getCurrentEnvironment, API_CONFIG } from '../config.js';
 import * as ApiService from '../apiService.js';
 import { get } from '../apiService.js';
@@ -120,11 +120,11 @@ async function checkBlackoutStatus() {
     }
 }
 
-// Clear session token (for testing)
+// Clear the "signed in" hint (for testing). The sailConnect session itself is unaffected.
 function clearSessionToken() {
-    if (confirm('Are you sure you want to clear your session token? You will need to sign in again.')) {
-        sessionStorage.removeItem('nsc_auth_token');
-        alert('Session token cleared!');
+    if (confirm('Clear the signed-in marker? Sign out at sailConnect to end the session.')) {
+        clearToken();
+        alert('Signed-in marker cleared!');
         displayAuthStatus();
     }
 }

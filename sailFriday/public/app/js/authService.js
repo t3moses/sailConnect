@@ -1,63 +1,25 @@
 /**
  * Authentication Service Module
  * Handles user authentication and session management using API
- * Uses sessionStorage for JWT token storage only (via tokenService)
+ * Sign-in itself happens at the sailConnect auth service (see ssoService)
  */
 
 import * as ApiService from './apiService.js';
-import { setToken, clearToken, hasToken } from './tokenService.js';
+import { clearToken, hasToken } from './tokenService.js';
+import { signOutUrl, redirectToSignIn } from './ssoService.js';
 
 /**
- * Sign in user via API
- * @param {string} email - User email
- * @param {string} password - User password (plain text)
- * @returns {Promise<Object>} Result object with success status
+ * Sign out of every sailConnect application and return to the home page
+ * @returns {void}
  */
-export async function signIn(email, password) {
-    try {
-        console.log('Attempting sign in for:', email);
-
-        // Call API login endpoint
-        const response = await ApiService.login(email, password);
-
-        if (!response.success) {
-            console.error('Sign in failed:', response.error);
-            return { success: false, error: response.error || 'Invalid email or password' };
-        }
-
-        // Store only the JWT token (no session object, no user caching)
-        setToken(response.data.token);
-
-        console.log('Sign in successful - token stored');
-
-        return { success: true };
-    } catch (error) {
-        console.error('Sign in failed:', error);
-        return { success: false, error: 'Sign in failed. Please check your connection.' };
-    }
-}
-
-/**
- * Sign out current user and redirect to home page
- * @returns {Promise<void>}
- */
-export async function signOut() {
-    try {
-        // Call API to invalidate session on server
-        await ApiService.logout();
-    } catch (error) {
-        console.error('Logout API call failed:', error);
-        // Continue with local cleanup even if API fails
-    } finally {
-        // Always clear token
-        clearToken();
-        window.location.href = 'index.html';
-    }
+export function signOut() {
+    clearToken();
+    window.location.href = signOutUrl();
 }
 
 /**
  * Check if user is signed in
- * @returns {boolean} True if JWT token exists
+ * @returns {boolean} True if the sailConnect "signed in" hint cookie exists
  */
 export function isSignedIn() {
     return hasToken();
@@ -212,22 +174,19 @@ export async function getCurrentUser() {
 export function requireAuth() {
     const signedIn = isSignedIn();
     if (!signedIn) {
-        window.location.href = 'signin.html';
+        redirectToSignIn();
         return false;
     }
     return true;
 }
 
 /**
- * Register new user via API
- * @param {Object} userData - User registration data
+ * Enroll the signed-in sailConnect user in Sail Friday
+ * @param {Object} userData - { accountType, profile }
  * @returns {Promise<Object>} Result object with success status
  */
 export async function register(userData) {
     try {
-        console.log('Registering user:', userData.email);
-
-        // Call API register endpoint
         const response = await ApiService.register(userData);
 
         if (!response.success) {
@@ -235,14 +194,22 @@ export async function register(userData) {
             return { success: false, error: response.error || 'Registration failed' };
         }
 
-        // Auto-login: Store only the JWT token
-        setToken(response.data.token);
-
-        console.log('User registered and signed in successfully');
-
         return { success: true, userId: response.data.user.id };
     } catch (error) {
         console.error('Registration failed:', error);
-        return { success: false, error: 'Registration failed. Please check your connection.' };
+        return { success: false, error: error.message || 'Registration failed. Please check your connection.' };
+    }
+}
+
+/**
+ * Get the signed-in sailConnect identity (name, email, membership)
+ * @returns {Promise<Object|null>} Identity or null when it cannot be loaded
+ */
+export async function getIdentity() {
+    try {
+        return await ApiService.getIdentity();
+    } catch (error) {
+        console.error('Failed to get identity:', error);
+        return null;
     }
 }

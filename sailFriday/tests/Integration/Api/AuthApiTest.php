@@ -7,7 +7,10 @@ namespace Tests\Integration\Api;
 use PHPUnit\Framework\TestCase;
 
 /**
- * API tests for Authentication endpoints
+ * API tests for the Sail Friday side of authentication.
+ *
+ * Sign-in, sign-out and passwords live in the sailConnect auth service; here a session is created
+ * directly in the auth database and sent as the shared sc_session cookie.
  */
 class AuthApiTest extends TestCase
 {
@@ -15,180 +18,141 @@ class AuthApiTest extends TestCase
 
     private string $baseUrl = 'http://localhost:8000/api';
 
-    public function testRegisterCrewAccount(): void
+    public function testRegisterCrewAccountEnrollsSignedInUser(): void
     {
         $suffix = $this->makeUniqueSuffix();
-        $firstName = "John{$suffix}";
-        $lastName = "Doe{$suffix}";
+        $session = $this->createAuthSession('john.doe.crew', "John{$suffix}", "Doe{$suffix}");
 
         $response = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
-            'email' => $this->makeUniqueEmail('john.doe.crew'),
-            'password' => 'TestPass123',
             'accountType' => 'crew',
-            'profile' => [
-                'displayName' => "John Doe {$suffix}",
-                'firstName' => $firstName,
-                'lastName' => $lastName,
-                'skill' => 1,
-            ],
-        ]);
+            'profile' => ['displayName' => "John Doe {$suffix}", 'skill' => 1],
+        ], [$this->sessionCookie($session['token'])]);
 
         $this->assertEquals(201, $response['status']);
         $this->assertTrue($response['body']['success']);
-        $this->assertArrayHasKey('token', $response['body']['data']);
-        $this->assertArrayHasKey('user', $response['body']['data']);
+        $this->assertArrayNotHasKey('token', $response['body']['data']);
 
-        // Cleanup
-        $userId = $response['body']['data']['user']['id'] ?? null;
-        $this->cleanupTestUser($userId);
+        $user = $response['body']['data']['user'];
+        $this->assertEquals($session['email'], $user['email']);
+        $this->assertEquals('crew', $user['accountType']);
+        $this->assertFalse($user['isAdmin']);
+
+        // Names come from the sailConnect identity
+        $profile = $this->makeRequest('GET', "{$this->baseUrl}/users/me", null, [$this->sessionCookie($session['token'])]);
+        $this->assertEquals("John{$suffix}", $profile['body']['data']['crewProfile']['firstName']);
+
+        $this->cleanupTestUser($user['id']);
     }
 
-    public function testRegisterCrewAccountWithExperience(): void
+    public function testRegisterIgnoresNamesSubmittedInProfile(): void
     {
         $suffix = $this->makeUniqueSuffix();
+        $session = $this->createAuthSession('real.name', "Real{$suffix}", 'Person');
 
         $response = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
-            'email' => $this->makeUniqueEmail('crew.experience'),
-            'password' => 'TestPass123',
             'accountType' => 'crew',
-            'profile' => [
-                'displayName' => "Exp Crew {$suffix}",
-                'firstName' => "ExpCrew{$suffix}",
-                'lastName' => "Sailor",
-                'skill' => 1,
-                'experience' => 'CANSail 1 and 2, 5 seasons at NSC',
-            ],
-        ]);
+            'profile' => ['firstName' => 'Spoofed', 'lastName' => 'Name', 'skill' => 1],
+        ], [$this->sessionCookie($session['token'])]);
 
         $this->assertEquals(201, $response['status']);
-        $this->assertTrue($response['body']['success']);
-        $userId = $response['body']['data']['user']['id'] ?? null;
-        $token = $response['body']['data']['token'];
 
-        // Verify the experience field was stored and is returned in the profile
-        $profileResponse = $this->makeRequest('GET', "{$this->baseUrl}/users/me", null, [
-            "Authorization: Bearer {$token}",
-        ]);
+        $profile = $this->makeRequest('GET', "{$this->baseUrl}/users/me", null, [$this->sessionCookie($session['token'])]);
+        $this->assertEquals("Real{$suffix}", $profile['body']['data']['crewProfile']['firstName']);
+        $this->assertEquals('Person', $profile['body']['data']['crewProfile']['lastName']);
 
-        $this->assertEquals(200, $profileResponse['status']);
-        $this->assertEquals(
-            'CANSail 1 and 2, 5 seasons at NSC',
-            $profileResponse['body']['data']['crewProfile']['experience']
-        );
-
-        $this->cleanupTestUser($userId);
+        $this->cleanupTestUser($response['body']['data']['user']['id']);
     }
 
     public function testRegisterBoatOwnerAccount(): void
     {
         $suffix = $this->makeUniqueSuffix();
-        $ownerFirstName = "TestBoat{$suffix}";
-        $ownerLastName = "Owner";
+        $session = $this->createAuthSession('mary.boat', "Mary{$suffix}", 'Captain');
 
         $response = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
-            'email' => $this->makeUniqueEmail('john.doe.boat'),
-            'password' => 'TestPass123',
             'accountType' => 'boat_owner',
             'profile' => [
-                'displayName' => "Test Boat {$suffix}",
-                'ownerFirstName' => $ownerFirstName,
-                'ownerLastName' => $ownerLastName,
+                'displayName' => "Sea Breeze {$suffix}",
                 'ownerMobile' => '555-1234',
                 'minBerths' => 2,
                 'maxBerths' => 4,
-                'assistanceRequired' => false,
-                'socialPreference' => true,
             ],
-        ]);
+        ], [$this->sessionCookie($session['token'])]);
 
         $this->assertEquals(201, $response['status']);
-        $this->assertTrue($response['body']['success']);
-        $this->assertArrayHasKey('token', $response['body']['data']);
-        $this->assertArrayHasKey('user', $response['body']['data']);
+        $this->assertEquals('boat_owner', $response['body']['data']['user']['accountType']);
 
-        // Cleanup
-        $userId = $response['body']['data']['user']['id'] ?? null;
-        $this->cleanupTestUser($userId);
+        $this->cleanupTestUser($response['body']['data']['user']['id']);
     }
 
-    public function testLoginWithValidCredentials(): void
+    public function testRegisterWithoutSessionIsUnauthorized(): void
     {
-        $email = $this->makeUniqueEmail('login.test');
-        $password = 'TestPass123';
-
-        // Register a test user first
-        $suffix = $this->makeUniqueSuffix();
-        $registerResponse = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
-            'email' => $email,
-            'password' => $password,
+        $response = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
             'accountType' => 'crew',
-            'profile' => [
-                'displayName' => "Login Test {$suffix}",
-                'firstName' => "Login{$suffix}",
-                'lastName' => "Test",
-                'skill' => 1,
-            ],
-        ]);
-
-        $this->assertEquals(201, $registerResponse['status']);
-        $userId = $registerResponse['body']['data']['user']['id'] ?? null;
-
-        // Now test login with valid credentials
-        $response = $this->makeRequest('POST', "{$this->baseUrl}/auth/login", [
-            'email' => $email,
-            'password' => $password,
-        ]);
-
-        $this->assertEquals(200, $response['status']);
-        $this->assertTrue($response['body']['success']);
-        $this->assertArrayHasKey('token', $response['body']['data']);
-        $this->assertArrayHasKey('user', $response['body']['data']);
-        $this->assertEquals($email, $response['body']['data']['user']['email']);
-
-        // Verify token works for authenticated requests
-        $token = $response['body']['data']['token'];
-        $assignmentsResponse = $this->makeRequest('GET', "{$this->baseUrl}/assignments", null, [
-            "Authorization: Bearer {$token}",
-        ]);
-        $this->assertContains($assignmentsResponse['status'], [200, 404]); // 404 if no assignments
-
-        // Cleanup
-        $this->cleanupTestUser($userId);
-    }
-
-    public function testLoginWithInvalidCredentials(): void
-    {
-        $email = $this->makeUniqueEmail('invalid.login');
-        $password = 'TestPass123';
-
-        // Register a test user first
-        $suffix = $this->makeUniqueSuffix();
-        $registerResponse = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
-            'email' => $email,
-            'password' => $password,
-            'accountType' => 'crew',
-            'profile' => [
-                'displayName' => "Invalid Login Test {$suffix}",
-                'firstName' => "Invalid{$suffix}",
-                'lastName' => "Test",
-                'skill' => 1,
-            ],
-        ]);
-
-        $userId = $registerResponse['body']['data']['user']['id'] ?? null;
-
-        // Test login with wrong password
-        $response = $this->makeRequest('POST', "{$this->baseUrl}/auth/login", [
-            'email' => $email,
-            'password' => 'WrongPassword123',
+            'profile' => ['skill' => 1],
         ]);
 
         $this->assertEquals(401, $response['status']);
-        $this->assertArrayHasKey('error', $response['body']);
-        $this->assertArrayNotHasKey('token', $response['body']['data'] ?? []);
+        $this->assertEquals('authentication_required', $response['body']['details']['code']);
+    }
 
-        // Cleanup
-        $this->cleanupTestUser($userId);
+    public function testRegisterValidationErrors(): void
+    {
+        $session = $this->createAuthSession('validation', 'Valid' . $this->makeUniqueSuffix(), 'Case');
+        $cookie = [$this->sessionCookie($session['token'])];
+
+        // Invalid account type
+        $response = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
+            'accountType' => 'invalid_type',
+            'profile' => ['skill' => 1],
+        ], $cookie);
+        $this->assertEquals(400, $response['status']);
+
+        // Boat with max berths below min berths
+        $response = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
+            'accountType' => 'boat_owner',
+            'profile' => ['minBerths' => 4, 'maxBerths' => 2],
+        ], $cookie);
+        $this->assertEquals(400, $response['status']);
+    }
+
+    public function testRegisterTwiceConflicts(): void
+    {
+        $testData = $this->createTestCrew($this->baseUrl);
+
+        $response = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
+            'accountType' => 'crew',
+            'profile' => ['skill' => 1],
+        ], [$this->sessionCookie($testData['token'])]);
+
+        $this->assertEquals(409, $response['status']);
+
+        $this->cleanupTestUser($testData['userId']);
+    }
+
+    public function testSignedInUserWithoutSailFridayAccountMustEnroll(): void
+    {
+        $session = $this->createAuthSession('unenrolled', 'Un' . $this->makeUniqueSuffix(), 'Enrolled');
+        $cookie = [$this->sessionCookie($session['token'])];
+
+        $response = $this->makeRequest('GET', "{$this->baseUrl}/users/me", null, $cookie);
+
+        $this->assertEquals(403, $response['status']);
+        $this->assertEquals('enrollment_required', $response['body']['details']['code']);
+    }
+
+    public function testGetIdentityWorksBeforeEnrollment(): void
+    {
+        $suffix = $this->makeUniqueSuffix();
+        $session = $this->createAuthSession('identity', "Ida{$suffix}", 'Lee', '7001-1234');
+
+        $response = $this->makeRequest('GET', "{$this->baseUrl}/auth/identity", null, [$this->sessionCookie($session['token'])]);
+
+        $this->assertEquals(200, $response['status']);
+        $identity = $response['body']['data']['identity'];
+        $this->assertEquals($session['email'], $identity['email']);
+        $this->assertEquals("Ida{$suffix}", $identity['firstName']);
+        $this->assertTrue($identity['isMember']);
+        $this->assertEquals('7001-1234', $identity['membershipNumber']);
     }
 
     public function testGetSession(): void
@@ -196,212 +160,44 @@ class AuthApiTest extends TestCase
         $testData = $this->createTestCrew($this->baseUrl);
 
         $response = $this->makeRequest('GET', "{$this->baseUrl}/auth/session", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
         $this->assertTrue($response['body']['success']);
-        $this->assertArrayHasKey('user', $response['body']['data']);
 
         $user = $response['body']['data']['user'];
-        $this->assertArrayHasKey('id', $user);
         $this->assertArrayHasKey('email', $user);
         $this->assertEquals($testData['userId'], $user['id']);
 
-        // Cleanup
         $this->cleanupTestUser($testData['userId']);
     }
 
-    public function testLogout(): void
+    public function testSessionEndedBySignOffIsRejected(): void
     {
         $testData = $this->createTestCrew($this->baseUrl);
+        $cookie = [$this->sessionCookie($testData['token'])];
 
-        $response = $this->makeRequest('POST', "{$this->baseUrl}/auth/logout", null, [
-            "Authorization: Bearer {$testData['token']}",
-        ]);
+        $this->assertEquals(200, $this->makeRequest('GET', "{$this->baseUrl}/auth/session", null, $cookie)['status']);
 
-        $this->assertEquals(200, $response['status']);
-        $this->assertTrue($response['body']['success']);
-        // Message field is optional
-        // $this->assertArrayHasKey('message', $response['body']);
+        // Sign-off at the auth service deletes the session row
+        $authDb = \SailConnect\Auth\Database::connect(\SailConnect\Auth\Config::load(dirname(__DIR__, 3) . '/../auth')->dbPath());
+        (new \SailConnect\Auth\SessionService($authDb, 60, 3600))->destroy($testData['token']);
 
-        // Note: Current JWT implementation is stateless, so token may still work
-        // This test verifies the logout endpoint works, not that the token is invalidated
+        $this->assertEquals(401, $this->makeRequest('GET', "{$this->baseUrl}/auth/session", null, $cookie)['status']);
 
-        // Cleanup
         $this->cleanupTestUser($testData['userId']);
     }
 
-    public function testLoginValidationErrors(): void
+    public function testRemovedCredentialEndpointsAreGone(): void
     {
-        // Test missing email
-        $response1 = $this->makeRequest('POST', "{$this->baseUrl}/auth/login", [
-            'password' => 'TestPass123',
-        ]);
-        $this->assertEquals(400, $response1['status']);
-        $this->assertArrayHasKey('error', $response1['body']);
-
-        // Test missing password
-        $response2 = $this->makeRequest('POST', "{$this->baseUrl}/auth/login", [
-            'email' => 'test@example.com',
-        ]);
-        $this->assertEquals(400, $response2['status']);
-        $this->assertArrayHasKey('error', $response2['body']);
-
-        // Test invalid email format
-        $response3 = $this->makeRequest('POST', "{$this->baseUrl}/auth/login", [
-            'email' => 'invalid-email',
-            'password' => 'TestPass123',
-        ]);
-        $this->assertContains($response3['status'], [400, 401]); // May be validation or auth error
-        $this->assertArrayHasKey('error', $response3['body']);
-
-        // Test empty request body
-        $response4 = $this->makeRequest('POST', "{$this->baseUrl}/auth/login", []);
-        $this->assertEquals(400, $response4['status']);
-        $this->assertArrayHasKey('error', $response4['body']);
+        foreach (['login', 'logout', 'forgot-password', 'reset-password'] as $endpoint) {
+            $response = $this->makeRequest('POST', "{$this->baseUrl}/auth/{$endpoint}", []);
+            $this->assertEquals(404, $response['status'], "/auth/{$endpoint} should no longer exist");
+        }
     }
 
-    public function testRegisterValidationErrors(): void
-    {
-        $suffix = $this->makeUniqueSuffix();
-
-        // Test missing email
-        $response1 = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
-            'password' => 'TestPass123',
-            'accountType' => 'crew',
-            'profile' => [
-                'displayName' => "Test {$suffix}",
-                'firstName' => "Test{$suffix}",
-                'lastName' => "User",
-                'skill' => 1,
-            ],
-        ]);
-        $this->assertEquals(400, $response1['status']);
-        $this->assertArrayHasKey('error', $response1['body']);
-
-        // Test password too short
-        $response2 = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
-            'email' => $this->makeUniqueEmail('short.pass'),
-            'password' => 'short',
-            'accountType' => 'crew',
-            'profile' => [
-                'displayName' => "Test {$suffix}",
-                'firstName' => "Test{$suffix}",
-                'lastName' => "User",
-                'skill' => 1,
-            ],
-        ]);
-        $this->assertEquals(400, $response2['status']);
-        $this->assertArrayHasKey('error', $response2['body']);
-
-        // Test invalid skill level
-        $response3 = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
-            'email' => $this->makeUniqueEmail('invalid.skill'),
-            'password' => 'TestPass123',
-            'accountType' => 'crew',
-            'profile' => [
-                'displayName' => "Test {$suffix}",
-                'firstName' => "Test{$suffix}",
-                'lastName' => "User",
-                'skill' => 999, // Invalid skill level
-            ],
-        ]);
-        // May return 400 (validation) or 500 (enum constraint violation)
-        $this->assertContains($response3['status'], [400, 500]);
-        $this->assertArrayHasKey('error', $response3['body']);
-
-        // Test missing required profile fields for crew
-        $response4 = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
-            'email' => $this->makeUniqueEmail('missing.fields'),
-            'password' => 'TestPass123',
-            'accountType' => 'crew',
-            'profile' => [
-                'displayName' => "Test {$suffix}",
-                // Missing firstName, lastName, skill
-            ],
-        ]);
-        $this->assertEquals(400, $response4['status']);
-        $this->assertArrayHasKey('error', $response4['body']);
-
-        // Test duplicate email (register same email twice)
-        $email = $this->makeUniqueEmail('duplicate.test');
-        $registerData = [
-            'email' => $email,
-            'password' => 'TestPass123',
-            'accountType' => 'crew',
-            'profile' => [
-                'displayName' => "Duplicate Test {$suffix}",
-                'firstName' => "Duplicate{$suffix}",
-                'lastName' => "Test",
-                'skill' => 1,
-            ],
-        ];
-
-        $response5a = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", $registerData);
-        $this->assertEquals(201, $response5a['status']);
-        $userId = $response5a['body']['data']['user']['id'] ?? null;
-
-        $response5b = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", $registerData);
-        $this->assertContains($response5b['status'], [400, 409]); // Bad request or conflict
-        $this->assertArrayHasKey('error', $response5b['body']);
-
-        // Cleanup
-        $this->cleanupTestUser($userId);
-    }
-
-    public function testPasswordChangeRoundTrip(): void
-    {
-        $email = $this->makeUniqueEmail('password.change');
-        $originalPassword = 'TestPass123';
-        $newPassword = 'NewPass456!';
-
-        // Register
-        $suffix = $this->makeUniqueSuffix();
-        $registerResponse = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
-            'email' => $email,
-            'password' => $originalPassword,
-            'accountType' => 'crew',
-            'profile' => [
-                'displayName' => "PwChange {$suffix}",
-                'firstName' => "PwChange{$suffix}",
-                'lastName' => "Test",
-                'skill' => 1,
-            ],
-        ]);
-        $this->assertEquals(201, $registerResponse['status']);
-        $userId = $registerResponse['body']['data']['user']['id'] ?? null;
-        $token = $registerResponse['body']['data']['token'];
-
-        // Change password via PATCH /api/users/me
-        $patchResponse = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me", [
-            'password' => $newPassword,
-            'currentPassword' => $originalPassword,
-        ], [
-            "Authorization: Bearer {$token}",
-        ]);
-        $this->assertEquals(200, $patchResponse['status']);
-
-        // Old password must no longer work
-        $oldLoginResponse = $this->makeRequest('POST', "{$this->baseUrl}/auth/login", [
-            'email' => $email,
-            'password' => $originalPassword,
-        ]);
-        $this->assertEquals(401, $oldLoginResponse['status']);
-
-        // New password must work
-        $newLoginResponse = $this->makeRequest('POST', "{$this->baseUrl}/auth/login", [
-            'email' => $email,
-            'password' => $newPassword,
-        ]);
-        $this->assertEquals(200, $newLoginResponse['status']);
-        $this->assertArrayHasKey('token', $newLoginResponse['body']['data']);
-
-        // Cleanup
-        $this->cleanupTestUser($userId);
-    }
-
-    public function testAuthenticationFailureWithoutToken(): void
+    public function testAuthenticationFailureWithoutSession(): void
     {
         $response = $this->makeRequest('GET', "{$this->baseUrl}/assignments");
 

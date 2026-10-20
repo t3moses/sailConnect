@@ -3,99 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In - NSC Sail Friday</title>
+    <title>Sign in - NSC Sail Friday</title>
     <link rel="icon" href="assets/knot-flat.png" type="image/png">
-    <!-- Auth init MUST run before page renders to prevent navigation jump -->
-    <script src="js/auth-init.js"></script>
-    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <header>
-        <div class="header-container">
-            <a href="index.html" class="logo">NSC Sail Friday</a>
-            <button class="hamburger" id="hamburger" aria-label="Toggle menu">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-            <nav id="nav">
-                <ul id="main-nav">
-                    <li><a href="index.html">Home</a></li>
-                    <li><a href="events.html">Events</a></li>
-
-                    <!-- Unauthenticated nav -->
-                    <li class="nav-unauthenticated">
-                        <a href="signin.html" class="nav-btn nav-btn-secondary active">Sign In</a>
-                    </li>
-                    <li class="nav-unauthenticated">
-                        <a href="account.html" class="nav-btn nav-btn-primary">Join Now</a>
-                    </li>
-
-                    <!-- Authenticated nav -->
-                    <li class="nav-authenticated">
-                        <a href="dashboard.html">Dashboard</a>
-                    </li>
-                    <li class="nav-authenticated user-greeting">
-                        <span>Hi, <span class="user-name">...</span>!</span>
-                    </li>
-                    <li class="nav-authenticated">
-                        <a href="#" class="sign-out-btn">Sign Out</a>
-                    </li>
-
-                    <li><a href="faq.html">FAQ</a></li>
-                </ul>
-            </nav>
-        </div>
-    </header>
-    <div class="menu-overlay" id="menu-overlay"></div>
-
-    <section class="hero">
-        <div class="hero-content">
-            <h1>Welcome Back!</h1>
-            <p>Sign in to manage your profile and event availability</p>
-        </div>
-    </section>
-
-    <main>
-        <div class="form-container signin-form">
-            <section class="section">
-                <h2>Sign In to Your Sail Friday Account</h2>
-
-                <form id="signin-form" action="#">
-                    <div class="form-group">
-                        <label for="email">Email *</label>
-                        <input type="email" id="email" name="email" required placeholder="your.email@example.com" autofocus>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="password">Password *</label>
-                        <input type="password" id="password" name="password" required placeholder="Enter your password">
-                    </div>
-
-                    <div style="text-align: center; margin-top: 3rem;">
-                        <button type="submit" class="btn btn-primary">Sign In</button>
-                    </div>
-                </form>
-
-                <div class="form-footer">
-                    <p>Don't have an account? <a href="account.html">Join now</a></p>
-                    <p style="margin-top: 1rem; font-size: 0.9rem;"><a href="forgot-password.html">Forgot your password?</a></p>
-                </div>
-            </section>
-        </div>
-    </main>
-
-    <footer>
-        <div class="footer-content">
-            <p><strong>Nepean Sailing Club — Sail Friday</strong></p>
-            <p><a href="https://nsc.ca">NSC Website</a> | <a href="faq.html">FAQ</a> | <a href="account.html">Join Now</a></p>
-            <p style="margin-top: 1rem; opacity: 0.7;">&copy; 2026 All Rights Reserved</p>
-        </div>
-    </footer>
-
-    <!-- Application modules -->
-    <script type="module" src="js/app.js"></script>
-    <script type="module" src="js/mobile-menu.js"></script>
+    <p style="font-family: sans-serif; text-align: center; margin-top: 3rem;">Redirecting to sailConnect&hellip;</p>
     <script type="module" src="js/pages/signin-page.js"></script>
 </body>
 </html>

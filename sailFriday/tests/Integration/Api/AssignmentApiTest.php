@@ -20,7 +20,7 @@ class AssignmentApiTest extends TestCase
         $testData = $this->createTestCrew($this->baseUrl);
 
         $response = $this->makeRequest('GET', "{$this->baseUrl}/assignments", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         // May return 404 if no assignments exist, which is acceptable
@@ -45,7 +45,7 @@ class AssignmentApiTest extends TestCase
                 ['eventId' => $eventId, 'isAvailable' => true],
             ],
         ], [
-            "Authorization: Bearer {$boatData['token']}",
+            "Cookie: sc_session={$boatData['token']}",
         ]);
 
         $crewAvailResponse = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me/availability", [
@@ -53,7 +53,7 @@ class AssignmentApiTest extends TestCase
                 ['eventId' => $eventId, 'isAvailable' => true],
             ],
         ], [
-            "Authorization: Bearer {$crewData['token']}",
+            "Cookie: sc_session={$crewData['token']}",
         ]);
 
         // May return 404 if event doesn't exist, 403 during blackout window
@@ -64,12 +64,12 @@ class AssignmentApiTest extends TestCase
         if ($boatAvailResponse['status'] === 200 && $crewAvailResponse['status'] === 200) {
             // Get boat owner's assignments
             $boatAssignResponse = $this->makeRequest('GET', "{$this->baseUrl}/assignments", null, [
-                "Authorization: Bearer {$boatData['token']}",
+                "Cookie: sc_session={$boatData['token']}",
             ]);
 
             // Get crew's assignments
             $crewAssignResponse = $this->makeRequest('GET', "{$this->baseUrl}/assignments", null, [
-                "Authorization: Bearer {$crewData['token']}",
+                "Cookie: sc_session={$crewData['token']}",
             ]);
 
             // Both should return 200 or 404 (may not be assigned yet)
@@ -129,7 +129,7 @@ class AssignmentApiTest extends TestCase
         $testData = $this->createTestCrew($this->baseUrl);
 
         $response = $this->makeRequest('POST', "{$this->baseUrl}/assignments/recalculate", [], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);

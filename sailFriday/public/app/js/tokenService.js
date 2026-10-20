@@ -1,47 +1,30 @@
 /**
- * Token Service Module
- * Handles JWT token storage using sessionStorage
+ * Session Hint Module
  *
- * Why sessionStorage?
- * - Better security: Cleared when tab closes
- * - User must sign in again after closing browser
- * - Standard practice for modern SPAs
- * - Balances security and user experience
+ * The real session is an HttpOnly cookie managed by the sailConnect auth service, so scripts
+ * cannot read it. The auth service also sets a readable marker cookie (sc_signed_in) so pages can
+ * pick signed-in or signed-out navigation synchronously. It is only a hint: the API decides.
  */
 
-const TOKEN_KEY = 'nsc_auth_token';
+const HINT_COOKIE = 'sc_signed_in';
 
 /**
- * Get JWT token from sessionStorage
- * @returns {string|null} Token string or null if not found
- */
-export function getToken() {
-    return sessionStorage.getItem(TOKEN_KEY);
-}
-
-/**
- * Store JWT token in sessionStorage
- * @param {string} token - JWT token string
- */
-export function setToken(token) {
-    if (!token) {
-        console.error('Attempted to set empty token');
-        return;
-    }
-    sessionStorage.setItem(TOKEN_KEY, token);
-}
-
-/**
- * Remove JWT token from sessionStorage
- */
-export function clearToken() {
-    sessionStorage.removeItem(TOKEN_KEY);
-}
-
-/**
- * Check if JWT token exists
- * @returns {boolean} True if token exists
+ * Check whether the sailConnect "signed in" hint cookie is present
+ * @returns {boolean} True if the hint exists
  */
 export function hasToken() {
-    return sessionStorage.getItem(TOKEN_KEY) !== null;
+    return document.cookie.split('; ').some(c => c.startsWith(HINT_COOKIE + '='));
+}
+
+/**
+ * Drop a stale hint (the server rejected the session). The auth service sets it on the parent
+ * domain, so clear it for both the parent domain and this host.
+ */
+export function clearToken() {
+    const expired = `${HINT_COOKIE}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+    const parts = window.location.hostname.split('.');
+    if (parts.length > 2) {
+        document.cookie = `${expired}; domain=.${parts.slice(1).join('.')}`;
+    }
+    document.cookie = expired;
 }

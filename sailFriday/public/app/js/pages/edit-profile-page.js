@@ -1,12 +1,12 @@
 /**
  * Edit Profile Page Module
- * Handles profile editing form and password changes
+ * Handles profile editing form (identity fields are edited in sailConnect)
  */
 
 import { requireAuth, getCurrentUser, signOut } from '../authService.js';
 import { updateAuthenticatedNavigation, addAdminLink } from '../navigationService.js';
 import { updateUser } from '../userService.js';
-import { validatePassword, getPasswordRequirementsHTML } from '../passwordValidator.js';
+import { profileUrl } from '../ssoService.js';
 import { showSuccess, showError } from '../toastService.js';
 
 // Make signOut available globally for onclick handlers
@@ -37,26 +37,31 @@ if (user.accountType === 'crew') {
     formHTML = `
         <h2>Your Info</h2>
 
+        <div class="alert alert-info">
+            Your name, email address, password and membership number are managed in your
+            <a href="${profileUrl()}">sailConnect account</a>.
+        </div>
+
         <div class="form-group">
             <label for="first_name">First Name *</label>
-            <input type="text" id="first_name" name="first_name" required placeholder="Enter your first name" value="${user.profile.firstName}">
+            <input type="text" id="first_name" name="first_name" placeholder="Enter your first name" value="${user.profile.firstName}" disabled style="background: #f5f5f5; cursor: not-allowed;">
         </div>
 
         <div class="form-group">
             <label for="last_name">Last Name *</label>
-            <input type="text" id="last_name" name="last_name" required placeholder="Enter your last name" value="${user.profile.lastName}">
+            <input type="text" id="last_name" name="last_name" placeholder="Enter your last name" value="${user.profile.lastName}" disabled style="background: #f5f5f5; cursor: not-allowed;">
         </div>
 
         <div class="form-group">
             <label for="email">Email *</label>
             <input type="email" id="email" name="email" required placeholder="your.email@example.com" value="${user.email}" disabled style="background: #f5f5f5; cursor: not-allowed;">
-            <small>Email cannot be changed. Contact admin if you need to update it.</small>
+            <small>Change your email address in your sailConnect account.</small>
         </div>
 
         <div class="form-group">
             <label for="membership_number">NSC Membership Number (Optional)</label>
-            <input type="text" id="membership_number" name="membership_number" placeholder="Enter your NSC membership number" value="${user.profile.membershipNumber || ''}">
-            <small>Found on your NSC membership card</small>
+            <input type="text" id="membership_number" name="membership_number" placeholder="Enter your NSC membership number" value="${user.profile.membershipNumber || ''}" disabled style="background: #f5f5f5; cursor: not-allowed;">
+            <small>Change this in your sailConnect account.</small>
         </div>
 
         <div class="form-group">
@@ -79,44 +84,31 @@ if (user.accountType === 'crew') {
             <small>Required to add you to the WhatsApp group.</small>
         </div>
 
-        <h2 style="margin-top: 4rem; margin-bottom: 2rem;">Change Password (Optional)</h2>
-
-        <div class="form-group">
-            <label for="current_password">Current Password</label>
-            <input type="password" id="current_password" name="current_password" placeholder="Enter current password">
-            <small>Only required if changing password</small>
-        </div>
-
-        <div class="form-group">
-            <label for="new_password">New Password</label>
-            <input type="password" id="new_password" name="new_password" minlength="8" placeholder="At least 8 characters">
-            <small>Password must contain:${getPasswordRequirementsHTML()}</small>
-        </div>
-
-        <div class="form-group">
-            <label for="confirm_new_password">Confirm New Password</label>
-            <input type="password" id="confirm_new_password" name="confirm_new_password" placeholder="Re-enter new password">
-        </div>
     `;
 } else {
     // Boat owner form
     formHTML = `
         <h2>About You</h2>
 
+        <div class="alert alert-info">
+            Your name, email address, password and membership number are managed in your
+            <a href="${profileUrl()}">sailConnect account</a>.
+        </div>
+
         <div class="form-group">
             <label for="first_name">First Name *</label>
-            <input type="text" id="first_name" name="first_name" required placeholder="Enter your first name" value="${user.profile.firstName}">
+            <input type="text" id="first_name" name="first_name" placeholder="Enter your first name" value="${user.profile.firstName}" disabled style="background: #f5f5f5; cursor: not-allowed;">
         </div>
 
         <div class="form-group">
             <label for="last_name">Last Name *</label>
-            <input type="text" id="last_name" name="last_name" required placeholder="Enter your last name" value="${user.profile.lastName}">
+            <input type="text" id="last_name" name="last_name" placeholder="Enter your last name" value="${user.profile.lastName}" disabled style="background: #f5f5f5; cursor: not-allowed;">
         </div>
 
         <div class="form-group">
             <label for="email">Email *</label>
             <input type="email" id="email" name="email" required placeholder="your.email@example.com" value="${user.email}" disabled style="background: #f5f5f5; cursor: not-allowed;">
-            <small>Email cannot be changed. Contact admin if you need to update it.</small>
+            <small>Change your email address in your sailConnect account.</small>
         </div>
 
         <div class="form-group">
@@ -178,24 +170,6 @@ if (user.accountType === 'crew') {
             </label>
         </div>
 
-        <h2 style="margin-top: 4rem; margin-bottom: 2rem;">Change Password (Optional)</h2>
-
-        <div class="form-group">
-            <label for="current_password">Current Password</label>
-            <input type="password" id="current_password" name="current_password" placeholder="Enter current password">
-            <small>Only required if changing password</small>
-        </div>
-
-        <div class="form-group">
-            <label for="new_password">New Password</label>
-            <input type="password" id="new_password" name="new_password" minlength="8" placeholder="At least 8 characters">
-            <small>Password must contain:${getPasswordRequirementsHTML()}</small>
-        </div>
-
-        <div class="form-group">
-            <label for="confirm_new_password">Confirm New Password</label>
-            <input type="password" id="confirm_new_password" name="confirm_new_password" placeholder="Re-enter new password">
-        </div>
     `;
 }
 
@@ -225,41 +199,6 @@ if (user.accountType === 'crew') {
 document.getElementById('edit-profile-form').addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    // Handle password change if provided
-    const currentPassword = document.getElementById('current_password').value;
-    const newPassword = document.getElementById('new_password').value;
-    const confirmNewPassword = document.getElementById('confirm_new_password').value;
-
-    // If any password field is filled, validate all password fields
-    if (currentPassword || newPassword || confirmNewPassword) {
-        if (!currentPassword) {
-            showError('Please enter your current password to change it.');
-            return;
-        }
-
-        if (!newPassword) {
-            showError('Please enter a new password.');
-            return;
-        }
-
-        if (newPassword !== confirmNewPassword) {
-            showError('New passwords do not match!');
-            return;
-        }
-
-        // Validate password requirements
-        const validation = validatePassword(newPassword);
-        if (!validation.isValid) {
-            showError(validation.error);
-            return;
-        }
-
-        // Password verification will be handled by backend API
-        // The API will verify the current password when we submit the profile update
-        // This is more secure than client-side verification
-        console.log('Password change requested - backend will verify current password');
-    }
-
     const saveButton = e.target.querySelector('[type="submit"]');
     const originalLabel = saveButton.textContent;
     saveButton.disabled = true;
@@ -270,17 +209,12 @@ document.getElementById('edit-profile-form').addEventListener('submit', async fu
 
     if (user.accountType === 'crew') {
         profileUpdates = {
-            firstName: document.getElementById('first_name').value,
-            lastName: document.getElementById('last_name').value,
-            membershipNumber: document.getElementById('membership_number').value,
             experience: document.getElementById('experience').value.trim(),
             socialPreference: document.getElementById('whatsapp_group').checked,
             mobile: document.getElementById('mobile').value
         };
     } else {
         profileUpdates = {
-            ownerFirstName: document.getElementById('first_name').value,
-            ownerLastName: document.getElementById('last_name').value,
             ownerMobile: document.getElementById('phone').value,
             displayName: document.getElementById('boat_name').value,
             minBerths: document.getElementById('min_crew').value,
@@ -298,11 +232,6 @@ document.getElementById('edit-profile-form').addEventListener('submit', async fu
         updates.crewProfile = profileUpdates;
     } else {
         updates.boatProfile = profileUpdates;
-    }
-
-    // Add password change if provided
-    if (newPassword) {
-        updates.password = newPassword;
     }
 
     const result = await updateUser(user.userId, updates);

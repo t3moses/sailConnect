@@ -8,12 +8,9 @@ export const API_CONFIG = {
     TIMEOUT: 10000, // 10 seconds
     ENDPOINTS: {
         // Auth endpoints
-        AUTH_LOGIN: '/auth/login',
         AUTH_REGISTER: '/auth/register',
-        AUTH_LOGOUT: '/auth/logout',
+        AUTH_IDENTITY: '/auth/identity',
         AUTH_SESSION: '/auth/session',
-        AUTH_FORGOT_PASSWORD: '/auth/forgot-password',
-        AUTH_RESET_PASSWORD: '/auth/reset-password',
 
         // User endpoints
         USERS: '/users',

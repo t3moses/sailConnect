@@ -3,10 +3,10 @@
  * Handles account type selection and routing
  */
 
-import { isSignedIn } from '../authService.js';
+import { getCurrentUser } from '../authService.js';
 
-// Check if already signed in
-if (await isSignedIn()) {
+// Already enrolled in Sail Friday? (Signed in to sailConnect but not enrolled stays here.)
+if (await getCurrentUser()) {
     window.location.href = 'dashboard.html';
 }
 

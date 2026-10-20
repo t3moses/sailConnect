@@ -8,15 +8,13 @@
  * <script src="js/auth-init.js"></script>
  * <link rel="stylesheet" href="css/styles.css">
  *
- * This script checks sessionStorage synchronously (no async/await) to determine
- * if a JWT token exists, then adds a CSS class to <html> element that controls
+ * This script checks the sailConnect hint cookie synchronously (no async/await) to determine
+ * if the user is signed in, then adds a CSS class to <html> element that controls
  * which navigation items are visible via CSS rules.
  */
 (function() {
-    const TOKEN_KEY = 'nsc_auth_token';
-
-    // Synchronous check - sessionStorage.getItem() is NOT async
-    const hasToken = sessionStorage.getItem(TOKEN_KEY) !== null;
+    // Synchronous check of the "signed in" hint cookie set by the sailConnect auth service
+    const hasToken = document.cookie.split('; ').some(c => c.startsWith('sc_signed_in='));
 
     // Add class to <html> element before page renders
     if (hasToken) {

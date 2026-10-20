@@ -11,9 +11,3 @@ parameters:
     # PHPStan needs more memory on Windows with this codebase size
     parallel:
         maximumNumberOfProcesses: 1
-    ignoreErrors:
-        -
-            message: '#^Strict comparison using === between non-empty-string and false will always evaluate to false\.$#'
-            identifier: identical.alwaysFalse
-            count: 1
-            path: src/Infrastructure/Service/PhpPasswordService.php

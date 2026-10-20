@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "914141cef6cd1ee4a272ce05c6159571",
+    "content-hash": "6fab2783537cd20dbd2e2377ea721e75",
     "packages": [
         {
             "name": "cakephp/chronos",
@@ -1677,6 +1677,36 @@
                 "source": "https://github.com/cakephp/phinx/tree/0.16.10"
             },
             "time": "2025-07-08T18:55:28+00:00"
+        },
+        {
+            "name": "sailconnect/auth",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "../auth",
+                "reference": "a5dd6fb3335ca5a53f7ff449fd1e7d610be06f14"
+            },
+            "require": {
+                "ext-curl": "*",
+                "ext-pdo_sqlite": "*",
+                "php": "^8.1",
+                "phpmailer/phpmailer": "^7.0",
+                "vlucas/phpdotenv": "^5.6"
+            },
+            "require-dev": {
+                "robmorgan/phinx": "^0.16"
+            },
+            "type": "project",
+            "autoload": {
+                "psr-4": {
+                    "SailConnect\\Auth\\": "src/",
+                    "SailConnect\\Auth\\Client\\": "client/"
+                }
+            },
+            "description": "Single sign-on and identity service for the sailConnect platform",
+            "transport-options": {
+                "relative": true
+            }
         },
         {
             "name": "symfony/config",
@@ -4749,7 +4779,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "sailconnect/auth": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

@@ -47,7 +47,7 @@ $routes = require __DIR__ . '/../config/routes.php';
 
 // Initialize middleware
 $corsMiddleware = new \App\Presentation\Middleware\CorsMiddleware($config['cors']);
-$jwtAuthMiddleware = $container->get(\App\Presentation\Middleware\JwtAuthMiddleware::class);
+$authMiddleware = $container->get(\App\Presentation\Middleware\AuthSessionMiddleware::class);
 $errorMiddleware = $container->get(\App\Presentation\Middleware\ErrorHandlerMiddleware::class);
 
 // Apply CORS headers
@@ -156,11 +156,13 @@ try {
     // Check authentication requirement
     $auth = null;
     if ($match['auth']) {
-        // JWT authentication
-        $auth = $jwtAuthMiddleware->authenticate();
+        // Shared sailConnect session cookie. 'identity' routes only need a signed-in sailConnect user.
+        $auth = $match['auth'] === 'identity'
+            ? $authMiddleware->identity()
+            : $authMiddleware->authenticate();
 
         if ($auth === null) {
-            $response = $jwtAuthMiddleware->authenticationFailed();
+            $response = $authMiddleware->authenticationFailed();
             $response->send();
             exit;
         }

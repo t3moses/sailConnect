@@ -12,8 +12,6 @@ use App\Application\Port\Repository\UserRepositoryInterface;
 use App\Application\Port\Service\CalendarServiceInterface;
 use App\Application\Port\Service\EmailServiceInterface;
 use App\Application\Port\Service\EmailTemplateServiceInterface;
-use App\Application\Port\Service\PasswordServiceInterface;
-use App\Application\Port\Service\TokenServiceInterface;
 use App\Application\Port\Service\TransactionServiceInterface;
 use App\Application\UseCase\Auth\RegisterUseCase;
 use App\Domain\Entity\Boat;
@@ -28,8 +26,6 @@ class RegisterUseCaseTest extends TestCase
     private UserRepositoryInterface $userRepository;
     private CrewRepositoryInterface $crewRepository;
     private BoatRepositoryInterface $boatRepository;
-    private PasswordServiceInterface $passwordService;
-    private TokenServiceInterface $tokenService;
     private RankingService $rankingService;
     private EmailServiceInterface $emailService;
     private EmailTemplateServiceInterface $emailTemplateService;
@@ -47,8 +43,6 @@ class RegisterUseCaseTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $this->boatRepository = $this->createMock(BoatRepositoryInterface::class);
-        $this->passwordService = $this->createMock(PasswordServiceInterface::class);
-        $this->tokenService = $this->createMock(TokenServiceInterface::class);
         $this->rankingService = $this->createMock(RankingService::class);
         $this->emailService = $this->createMock(EmailServiceInterface::class);
         $this->emailTemplateService = $this->createMock(EmailTemplateServiceInterface::class);
@@ -66,10 +60,6 @@ class RegisterUseCaseTest extends TestCase
 
         // Setup common mock behaviors
         $this->userRepository->method('emailExists')->willReturn(false);
-        $this->passwordService->method('meetsRequirements')->willReturn(true);
-        $this->passwordService->method('hash')->willReturn('$2y$10$hashedpassword');
-        $this->tokenService->method('generate')->willReturn('mock.jwt.token');
-        $this->tokenService->method('getExpirationMinutes')->willReturn(60);
 
         // Default: no display name clashes
         $this->crewRepository->method('displayNameExists')->willReturn(false);
@@ -138,8 +128,6 @@ class RegisterUseCaseTest extends TestCase
             $this->userRepository,
             $this->crewRepository,
             $this->boatRepository,
-            $this->passwordService,
-            $this->tokenService,
             $this->rankingService,
             $this->emailService,
             $this->emailTemplateService,
@@ -149,6 +137,24 @@ class RegisterUseCaseTest extends TestCase
             $this->transactionService,
             new NullLogger()
         );
+    }
+
+    /**
+     * Build the sailConnect identity the signed-in user would have for this request.
+     * Names and membership come from the identity, so mirror what the test put in the profile.
+     */
+    private function identity(string $email, RegisterRequest $request): array
+    {
+        $p = $request->profile ?? [];
+
+        return [
+            'user_id' => 'auth-' . md5($email),
+            'email_address' => $email,
+            'first_name' => $p['firstName'] ?? $p['ownerFirstName'] ?? 'Test',
+            'last_name' => $p['lastName'] ?? $p['ownerLastName'] ?? 'User',
+            'is_member' => !empty($p['membershipNumber']),
+            'membership_number' => $p['membershipNumber'] ?? null,
+        ];
     }
 
     public function testCrewDisplayNameGeneratedWhenNull(): void
@@ -165,8 +171,6 @@ class RegisterUseCaseTest extends TestCase
             }));
 
         $request = new RegisterRequest(
-            email: 'john.smith@example.com',
-            password: 'SecurePass123!',
             accountType: 'crew',
             profile: [
                 'firstName' => 'John',
@@ -174,9 +178,10 @@ class RegisterUseCaseTest extends TestCase
                 // No displayName provided
             ]
         );
+        $identity = $this->identity('john.smith@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert
         $this->assertNotNull($capturedCrew);
@@ -197,8 +202,6 @@ class RegisterUseCaseTest extends TestCase
             }));
 
         $request = new RegisterRequest(
-            email: 'jane.doe@example.com',
-            password: 'SecurePass123!',
             accountType: 'crew',
             profile: [
                 'firstName' => 'Jane',
@@ -206,9 +209,10 @@ class RegisterUseCaseTest extends TestCase
                 'displayName' => '',  // Empty string
             ]
         );
+        $identity = $this->identity('jane.doe@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert
         $this->assertNotNull($capturedCrew);
@@ -229,8 +233,6 @@ class RegisterUseCaseTest extends TestCase
             }));
 
         $request = new RegisterRequest(
-            email: 'custom.user@example.com',
-            password: 'SecurePass123!',
             accountType: 'crew',
             profile: [
                 'firstName' => 'Sarah',
@@ -238,9 +240,10 @@ class RegisterUseCaseTest extends TestCase
                 'displayName' => 'Skipper Sarah',  // Custom displayName
             ]
         );
+        $identity = $this->identity('custom.user@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert
         $this->assertNotNull($capturedCrew);
@@ -261,8 +264,6 @@ class RegisterUseCaseTest extends TestCase
             }));
 
         $request = new RegisterRequest(
-            email: 'li.ming@example.com',
-            password: 'SecurePass123!',
             accountType: 'crew',
             profile: [
                 'firstName' => '李',
@@ -270,9 +271,10 @@ class RegisterUseCaseTest extends TestCase
                 // No displayName provided
             ]
         );
+        $identity = $this->identity('li.ming@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert
         $this->assertNotNull($capturedCrew);
@@ -293,8 +295,6 @@ class RegisterUseCaseTest extends TestCase
             }));
 
         $request = new RegisterRequest(
-            email: 'bob.boat@example.com',
-            password: 'SecurePass123!',
             accountType: 'boat_owner',
             profile: [
                 'ownerFirstName' => 'Bob',
@@ -305,9 +305,10 @@ class RegisterUseCaseTest extends TestCase
                 // No displayName provided
             ]
         );
+        $identity = $this->identity('bob.boat@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert
         $this->assertNotNull($capturedBoat);
@@ -328,8 +329,6 @@ class RegisterUseCaseTest extends TestCase
             }));
 
         $request = new RegisterRequest(
-            email: 'alice.boat@example.com',
-            password: 'SecurePass123!',
             accountType: 'boat_owner',
             profile: [
                 'ownerFirstName' => 'Alice',
@@ -340,9 +339,10 @@ class RegisterUseCaseTest extends TestCase
                 'displayName' => '   ',  // Whitespace only
             ]
         );
+        $identity = $this->identity('alice.boat@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert
         $this->assertNotNull($capturedBoat);
@@ -363,8 +363,6 @@ class RegisterUseCaseTest extends TestCase
             }));
 
         $request = new RegisterRequest(
-            email: 'custom.boat@example.com',
-            password: 'SecurePass123!',
             accountType: 'boat_owner',
             profile: [
                 'ownerFirstName' => 'Mike',
@@ -375,9 +373,10 @@ class RegisterUseCaseTest extends TestCase
                 'displayName' => 'Sea Breeze',  // Custom boat name
             ]
         );
+        $identity = $this->identity('custom.boat@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert
         $this->assertNotNull($capturedBoat);
@@ -398,17 +397,16 @@ class RegisterUseCaseTest extends TestCase
             }));
 
         $request = new RegisterRequest(
-            email: 'whitespace@example.com',
-            password: 'SecurePass123!',
             accountType: 'crew',
             profile: [
                 'firstName' => '  Mary  ',  // Whitespace around name
                 'lastName' => 'Brown',
             ]
         );
+        $identity = $this->identity('whitespace@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert
         $this->assertNotNull($capturedCrew);
@@ -429,8 +427,6 @@ class RegisterUseCaseTest extends TestCase
             }));
 
         $request = new RegisterRequest(
-            email: 'boat.key@example.com',
-            password: 'SecurePass123!',
             accountType: 'boat_owner',
             profile: [
                 'ownerFirstName' => 'Chris',
@@ -440,9 +436,10 @@ class RegisterUseCaseTest extends TestCase
                 'maxBerths' => 4,
             ]
         );
+        $identity = $this->identity('boat.key@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert
         $this->assertNotNull($capturedBoat);
@@ -466,8 +463,6 @@ class RegisterUseCaseTest extends TestCase
             });
 
         $request = new RegisterRequest(
-            email: 'john.doe@example.com',
-            password: 'SecurePass123!',
             accountType: 'crew',
             profile: [
                 'firstName' => 'John',
@@ -476,13 +471,14 @@ class RegisterUseCaseTest extends TestCase
                 'skill' => 1,
             ]
         );
+        $identity = $this->identity('john.doe@example.com', $request);
 
         // Act
-        $response = $this->useCase->execute($request);
+        $response = $this->useCase->execute($request, $identity);
 
         // Assert response
         $this->assertNotNull($response);
-        $this->assertEquals('mock.jwt.token', $response->token);
+        $this->assertSame(1, $response->id);
 
         // Assert admin notification was sent to both the primary and secondary recipients
         foreach (['test-admin@example.com', 'test-admin-secondary@example.com'] as $expectedRecipient) {
@@ -509,8 +505,6 @@ class RegisterUseCaseTest extends TestCase
             });
 
         $request = new RegisterRequest(
-            email: 'captain@example.com',
-            password: 'SecurePass123!',
             accountType: 'boat_owner',
             profile: [
                 'ownerFirstName' => 'Captain',
@@ -520,13 +514,14 @@ class RegisterUseCaseTest extends TestCase
                 'maxBerths' => 4,
             ]
         );
+        $identity = $this->identity('captain@example.com', $request);
 
         // Act
-        $response = $this->useCase->execute($request);
+        $response = $this->useCase->execute($request, $identity);
 
         // Assert response
         $this->assertNotNull($response);
-        $this->assertEquals('mock.jwt.token', $response->token);
+        $this->assertSame(1, $response->id);
 
         // Assert admin notification was sent to both the primary and secondary recipients
         foreach (['test-admin@example.com', 'test-admin-secondary@example.com'] as $expectedRecipient) {
@@ -549,21 +544,20 @@ class RegisterUseCaseTest extends TestCase
             ->willReturn(false);
 
         $request = new RegisterRequest(
-            email: 'test@example.com',
-            password: 'SecurePass123!',
             accountType: 'crew',
             profile: [
                 'firstName' => 'Test',
                 'lastName' => 'User',
             ]
         );
+        $identity = $this->identity('test@example.com', $request);
 
         // Act
-        $response = $this->useCase->execute($request);
+        $response = $this->useCase->execute($request, $identity);
 
         // Assert - Registration should still succeed
         $this->assertNotNull($response);
-        $this->assertEquals('mock.jwt.token', $response->token);
+        $this->assertSame(1, $response->id);
     }
 
     public function testRegistrationSucceedsWhenEmailThrowsException(): void
@@ -577,21 +571,20 @@ class RegisterUseCaseTest extends TestCase
             ->willThrowException(new \Exception('Email service unavailable'));
 
         $request = new RegisterRequest(
-            email: 'exception@example.com',
-            password: 'SecurePass123!',
             accountType: 'crew',
             profile: [
                 'firstName' => 'Exception',
                 'lastName' => 'Test',
             ]
         );
+        $identity = $this->identity('exception@example.com', $request);
 
         // Act
-        $response = $this->useCase->execute($request);
+        $response = $this->useCase->execute($request, $identity);
 
         // Assert - Registration should still succeed despite email exception
         $this->assertNotNull($response);
-        $this->assertEquals('mock.jwt.token', $response->token);
+        $this->assertSame(1, $response->id);
     }
 
     public function testEmailContainsCrewDetailsForCrewRegistration(): void
@@ -609,8 +602,6 @@ class RegisterUseCaseTest extends TestCase
             });
 
         $request = new RegisterRequest(
-            email: 'detailed@example.com',
-            password: 'SecurePass123!',
             accountType: 'crew',
             profile: [
                 'firstName' => 'Detailed',
@@ -621,9 +612,10 @@ class RegisterUseCaseTest extends TestCase
                 'mobile' => '555-1234',
             ]
         );
+        $identity = $this->identity('detailed@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert - Verify admin email contains key crew details
         $adminEmails = array_filter($capturedEmails, fn($e) => $e['to'] === 'test-admin@example.com');
@@ -659,8 +651,6 @@ class RegisterUseCaseTest extends TestCase
             $this->userRepository,
             $this->crewRepository,
             $this->boatRepository,
-            $this->passwordService,
-            $this->tokenService,
             $this->rankingService,
             $this->emailService,
             $this->emailTemplateService,
@@ -672,17 +662,16 @@ class RegisterUseCaseTest extends TestCase
         );
 
         $request = new RegisterRequest(
-            email: 'john.denver@example.com',
-            password: 'SecurePass123!',
             accountType: 'crew',
             profile: [
                 'firstName' => 'John',
                 'lastName' => 'Denver',
             ]
         );
+        $identity = $this->identity('john.denver@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert: display name got the "2" suffix because "JohnD" was taken
         $this->assertNotNull($capturedCrew);
@@ -711,8 +700,6 @@ class RegisterUseCaseTest extends TestCase
             $this->userRepository,
             $this->crewRepository,
             $this->boatRepository,
-            $this->passwordService,
-            $this->tokenService,
             $this->rankingService,
             $this->emailService,
             $this->emailTemplateService,
@@ -724,8 +711,6 @@ class RegisterUseCaseTest extends TestCase
         );
 
         $request = new RegisterRequest(
-            email: 'john.davidson@example.com',
-            password: 'SecurePass123!',
             accountType: 'boat_owner',
             profile: [
                 'ownerFirstName' => 'John',
@@ -734,9 +719,10 @@ class RegisterUseCaseTest extends TestCase
                 'maxBerths' => 4,
             ]
         );
+        $identity = $this->identity('john.davidson@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert: display name got the "2" suffix because "JohnD" was taken
         $this->assertNotNull($capturedBoat);
@@ -776,8 +762,6 @@ class RegisterUseCaseTest extends TestCase
             $this->userRepository,
             $this->crewRepository,
             $this->boatRepository,
-            $this->passwordService,
-            $this->tokenService,
             $this->rankingService,
             $this->emailService,
             $this->emailTemplateService,
@@ -789,13 +773,12 @@ class RegisterUseCaseTest extends TestCase
         );
 
         $request = new RegisterRequest(
-            email: 'new@example.com',
-            password: 'SecurePass123!',
             accountType: 'crew',
             profile: ['firstName' => 'New', 'lastName' => 'User']
         );
+        $identity = $this->identity('new@example.com', $request);
 
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         $this->assertNotNull($capturedArgs);
         $this->assertEquals('new@example.com', $capturedArgs[0]);
@@ -818,8 +801,6 @@ class RegisterUseCaseTest extends TestCase
             });
 
         $request = new RegisterRequest(
-            email: 'boat@example.com',
-            password: 'SecurePass123!',
             accountType: 'boat_owner',
             profile: [
                 'ownerFirstName' => 'Boat',
@@ -832,9 +813,10 @@ class RegisterUseCaseTest extends TestCase
                 'socialPreference' => true,
             ]
         );
+        $identity = $this->identity('boat@example.com', $request);
 
         // Act
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Assert - Verify admin email contains key boat details
         $adminEmails = array_filter($capturedEmails, fn($e) => $e['to'] === 'test-admin@example.com');
@@ -847,5 +829,54 @@ class RegisterUseCaseTest extends TestCase
         $this->assertStringContainsString('555-5678', $capturedEmailBody); // mobile
         $this->assertStringContainsString('Yes', $capturedEmailBody); // assistance required
         $this->assertStringContainsString('boat@example.com', $capturedEmailBody); // email
+    }
+
+    public function testIdentityNamesOverrideSubmittedProfileNames(): void
+    {
+        $this->crewRepository->method('findByKey')->willReturn(null);
+
+        $capturedCrew = null;
+        $this->crewRepository->expects($this->once())
+            ->method('save')
+            ->with($this->callback(function (Crew $crew) use (&$capturedCrew) {
+                $capturedCrew = $crew;
+                return true;
+            }));
+
+        $request = new RegisterRequest(
+            accountType: 'crew',
+            profile: ['firstName' => 'Spoofed', 'lastName' => 'Name', 'membershipNumber' => '9999-1']
+        );
+        $identity = [
+            'user_id' => 'auth-1', 'email_address' => 'real@example.com',
+            'first_name' => 'Real', 'last_name' => 'Person', 'is_member' => false, 'membership_number' => null,
+        ];
+
+        $this->useCase->execute($request, $identity);
+
+        $this->assertSame('Real', $capturedCrew->getFirstName());
+        $this->assertSame('Person', $capturedCrew->getLastName());
+        $this->assertNull($capturedCrew->getMembershipNumber());
+    }
+
+    public function testRejectsIdentityThatIsAlreadyEnrolled(): void
+    {
+        $userRepository = $this->createMock(UserRepositoryInterface::class);
+        $userRepository->method('findByAuthUserId')->willReturn(
+            new \App\Domain\Entity\User('real@example.com', '', 'crew', false, null, null, null, null, 'auth-1')
+        );
+        $useCase = new RegisterUseCase(
+            $userRepository, $this->crewRepository, $this->boatRepository, $this->rankingService,
+            $this->emailService, $this->emailTemplateService, $this->eventRepository, $this->calendarService,
+            $this->config, $this->transactionService, new NullLogger()
+        );
+        $request = new RegisterRequest(accountType: 'crew', profile: []);
+        $identity = [
+            'user_id' => 'auth-1', 'email_address' => 'real@example.com',
+            'first_name' => 'Real', 'last_name' => 'Person', 'is_member' => false, 'membership_number' => null,
+        ];
+
+        $this->expectException(\App\Application\Exception\UserAlreadyExistsException::class);
+        $useCase->execute($request, $identity);
     }
 }

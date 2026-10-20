@@ -68,6 +68,21 @@ class UserRepository implements UserRepositoryInterface
     }
 
     /**
+     * Find user by sailConnect (auth service) user ID
+     *
+     * @param string $authUserId Auth user ID
+     * @return User|null User entity or null if not linked
+     */
+    public function findByAuthUserId(string $authUserId): ?User
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM users WHERE auth_user_id = :id LIMIT 1');
+        $stmt->execute(['id' => $authUserId]);
+        $row = $stmt->fetch();
+
+        return $row === false ? null : $this->hydrate($row);
+    }
+
+    /**
      * Check if email already exists
      *
      * @param string $email Email address to check
@@ -147,8 +162,8 @@ class UserRepository implements UserRepositoryInterface
     private function insert(User $user): void
     {
         $stmt = $this->pdo->prepare('
-            INSERT INTO users (email, password_hash, account_type, is_admin, last_login, last_logout, created_at, updated_at)
-            VALUES (:email, :password_hash, :account_type, :is_admin, :last_login, :last_logout, :created_at, :updated_at)
+            INSERT INTO users (email, password_hash, account_type, is_admin, last_login, last_logout, created_at, updated_at, auth_user_id)
+            VALUES (:email, :password_hash, :account_type, :is_admin, :last_login, :last_logout, :created_at, :updated_at, :auth_user_id)
         ');
 
         $stmt->execute([
@@ -160,6 +175,7 @@ class UserRepository implements UserRepositoryInterface
             'last_logout' => $user->getLastLogout()?->format('Y-m-d H:i:s'),
             'created_at' => $user->getCreatedAt()->format('Y-m-d H:i:s'),
             'updated_at' => $user->getUpdatedAt()->format('Y-m-d H:i:s'),
+            'auth_user_id' => $user->getAuthUserId(),
         ]);
 
         // Set the auto-generated ID on the entity
@@ -182,7 +198,8 @@ class UserRepository implements UserRepositoryInterface
                 is_admin = :is_admin,
                 last_login = :last_login,
                 last_logout = :last_logout,
-                updated_at = :updated_at
+                updated_at = :updated_at,
+                auth_user_id = :auth_user_id
             WHERE id = :id
         ');
 
@@ -195,6 +212,7 @@ class UserRepository implements UserRepositoryInterface
             'last_login' => $user->getLastLogin()?->format('Y-m-d H:i:s'),
             'last_logout' => $user->getLastLogout()?->format('Y-m-d H:i:s'),
             'updated_at' => $user->getUpdatedAt()->format('Y-m-d H:i:s'),
+            'auth_user_id' => $user->getAuthUserId(),
         ]);
     }
 
@@ -215,6 +233,7 @@ class UserRepository implements UserRepositoryInterface
             lastLogout: $row['last_logout'] ? new \DateTimeImmutable($row['last_logout']) : null,
             createdAt: new \DateTimeImmutable($row['created_at']),
             updatedAt: new \DateTimeImmutable($row['updated_at']),
+            authUserId: $row['auth_user_id'] ?? null,
         );
 
         $user->setId((int)$row['id']);

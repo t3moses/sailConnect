@@ -24,7 +24,7 @@ class AvailabilityApiTest extends TestCase
                 ['eventId' => 'Fri May 29', 'isAvailable' => true],
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         // May return 404 if event doesn't exist, 403 during blackout window
@@ -44,7 +44,7 @@ class AvailabilityApiTest extends TestCase
                 ['eventId' => 'Fri May 29', 'isAvailable' => true],
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         // May return 404 if event doesn't exist, 403 during blackout window
@@ -70,7 +70,7 @@ class AvailabilityApiTest extends TestCase
                 ['eventId' => 'Fri May 29', 'isAvailable' => true],
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         // May return 404 if event doesn't exist, 403 during blackout window
@@ -98,7 +98,7 @@ class AvailabilityApiTest extends TestCase
                 ['eventId' => 'Fri May 29', 'isAvailable' => true],
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         // May return 404 if event doesn't exist, 403 during blackout window
@@ -124,7 +124,7 @@ class AvailabilityApiTest extends TestCase
                 ['eventId' => 'Fri May 29', 'isAvailable' => true],
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         // May return 404 if event doesn't exist, 403 during blackout window
@@ -137,7 +137,7 @@ class AvailabilityApiTest extends TestCase
                     ['eventId' => 'Fri May 29', 'isAvailable' => true],
                 ],
             ], [
-                "Authorization: Bearer {$testData['token']}",
+                "Cookie: sc_session={$testData['token']}",
             ]);
 
             $this->assertEquals(200, $response2['status']);
@@ -162,7 +162,7 @@ class AvailabilityApiTest extends TestCase
                 ['eventId' => 'Fri Jun 05', 'isAvailable' => false],
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         // May return 404 if events don't exist, 403 during blackout window
@@ -170,7 +170,7 @@ class AvailabilityApiTest extends TestCase
 
         // Now get the availability
         $response = $this->makeRequest('GET', "{$this->baseUrl}/users/me/availability", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
@@ -205,7 +205,7 @@ class AvailabilityApiTest extends TestCase
                 ['eventId' => 'Fri May 29', 'isAvailable' => true, 'berths' => 2],
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         // 200 if event exists, 404 if not, 403 during blackout window
@@ -227,7 +227,7 @@ class AvailabilityApiTest extends TestCase
                 ['eventId' => 'Fri May 29', 'isAvailable' => true, 'berths' => 99],
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         // 400 if event exists and berths > maxBerths; 404 if event doesn't exist; 403 during blackout
@@ -244,13 +244,13 @@ class AvailabilityApiTest extends TestCase
         $response1 = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me/availability", [
             'availabilities' => [],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         $this->assertContains($response1['status'], [200, 400, 403]);
 
         // Test missing availabilities field - may accept as "no changes"
         $response2 = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me/availability", [], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         $this->assertContains($response2['status'], [200, 400, 403]);
 
@@ -260,7 +260,7 @@ class AvailabilityApiTest extends TestCase
                 ['eventId' => 'Fri May 29', 'isAvailable' => 'yes'], // String instead of boolean
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         // May accept due to PHP type coercion, but worth testing
         $this->assertContains($response3['status'], [200, 400, 404]);
@@ -271,7 +271,7 @@ class AvailabilityApiTest extends TestCase
                 ['isAvailable' => true], // Missing eventId
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         $this->assertContains($response4['status'], [200, 400, 404]);
 
@@ -281,7 +281,7 @@ class AvailabilityApiTest extends TestCase
                 ['eventId' => 'Fri May 29'], // Missing isAvailable
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         $this->assertContains($response5['status'], [200, 400, 404]);
 

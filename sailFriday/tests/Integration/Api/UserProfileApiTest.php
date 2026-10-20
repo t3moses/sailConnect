@@ -20,7 +20,7 @@ class UserProfileApiTest extends TestCase
         $testData = $this->createTestCrew($this->baseUrl);
 
         $response = $this->makeRequest('GET', "{$this->baseUrl}/users/me", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
@@ -47,7 +47,7 @@ class UserProfileApiTest extends TestCase
         $testData = $this->createTestBoatOwner($this->baseUrl);
 
         $response = $this->makeRequest('GET', "{$this->baseUrl}/users/me", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
@@ -69,45 +69,35 @@ class UserProfileApiTest extends TestCase
         $this->cleanupTestUser($testData['userId']);
     }
 
-    public function testUpdateEmailOnly(): void
+    public function testUpdateEmailIsRejectedBecauseSailConnectOwnsIt(): void
     {
         $testData = $this->createTestCrew($this->baseUrl);
-        $newEmail = $this->makeUniqueEmail('updated.email');
 
         $response = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me", [
-            'email' => $newEmail,
+            'email' => $this->makeUniqueEmail('updated'),
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
-        $this->assertEquals(200, $response['status']);
-        $this->assertTrue($response['body']['success']);
-        $this->assertArrayHasKey('profile', $response['body']['data']);
-
-        $profile = $response['body']['data']['profile'];
-
-        // Verify email was updated
-        $this->assertEquals($newEmail, $profile['user']['email']);
+        $this->assertEquals(400, $response['status']);
+        $this->assertArrayHasKey('email', $response['body']['details']);
 
         // Cleanup
         $this->cleanupTestUser($testData['userId']);
     }
 
-    public function testUpdatePasswordOnly(): void
+    public function testUpdatePasswordIsRejectedBecauseSailConnectOwnsIt(): void
     {
         $testData = $this->createTestCrew($this->baseUrl);
 
         $response = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me", [
             'password' => 'NewSecurePass123!',
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
-        $this->assertEquals(200, $response['status']);
-        $this->assertTrue($response['body']['success']);
-        $this->assertArrayHasKey('profile', $response['body']['data']);
-
-        // Password is hashed, can't verify directly, but success indicates it worked
+        $this->assertEquals(400, $response['status']);
+        $this->assertArrayHasKey('password', $response['body']['details']);
 
         // Cleanup
         $this->cleanupTestUser($testData['userId']);
@@ -124,10 +114,9 @@ class UserProfileApiTest extends TestCase
                 'mobile' => '555-9999',
                 'skill' => 2,
                 'socialPreference' => false,
-                'membershipNumber' => 'NSC99999',
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
@@ -141,7 +130,6 @@ class UserProfileApiTest extends TestCase
         $this->assertEquals('555-9999', $crew['mobile']);
         $this->assertEquals(2, $crew['skill']);
         $this->assertFalse($crew['socialPreference']);
-        $this->assertEquals('NSC99999', $crew['membershipNumber']);
 
         // Cleanup
         $this->cleanupTestUser($testData['userId']);
@@ -162,7 +150,7 @@ class UserProfileApiTest extends TestCase
                 'socialPreference' => false,
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
@@ -183,20 +171,19 @@ class UserProfileApiTest extends TestCase
         $this->cleanupTestUser($testData['userId']);
     }
 
-    public function testUpdateMultipleFields(): void
+    public function testUpdateMultipleCrewFields(): void
     {
         $testData = $this->createTestCrew($this->baseUrl);
-        $newEmail = $this->makeUniqueEmail('updated.multi');
         $suffix = $this->makeUniqueSuffix();
 
         $response = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me", [
-            'email' => $newEmail,
             'crewProfile' => [
+                'mobile' => '555-4321',
                 'displayName' => "Multi Update {$suffix}",
                 'skill' => 2,
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
@@ -205,10 +192,8 @@ class UserProfileApiTest extends TestCase
 
         $profile = $response['body']['data']['profile'];
 
-        // Verify email was updated
-        $this->assertEquals($newEmail, $profile['user']['email']);
-
         // Verify crew profile was updated
+        $this->assertEquals('555-4321', $profile['crewProfile']['mobile']);
         $this->assertEquals("Multi Update {$suffix}", $profile['crewProfile']['displayName']);
         $this->assertEquals(2, $profile['crewProfile']['skill']);
 
@@ -224,7 +209,7 @@ class UserProfileApiTest extends TestCase
         $response1 = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me", [
             'email' => 'invalid-email',
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(400, $response1['status']);
@@ -234,7 +219,7 @@ class UserProfileApiTest extends TestCase
         $response2 = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me", [
             'password' => 'short',
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(400, $response2['status']);
@@ -242,7 +227,7 @@ class UserProfileApiTest extends TestCase
 
         // Test 3: Empty request body (no updates)
         $response3 = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me", [], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(400, $response3['status']);
@@ -269,7 +254,7 @@ class UserProfileApiTest extends TestCase
                 'socialPreference' => false,
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(201, $response['status']);
@@ -278,7 +263,7 @@ class UserProfileApiTest extends TestCase
 
         // Verify both profiles exist
         $profileResponse = $this->makeRequest('GET', "{$this->baseUrl}/users/me", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $profileResponse['status']);
@@ -311,7 +296,7 @@ class UserProfileApiTest extends TestCase
                 'socialPreference' => false,
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(201, $response['status']);
@@ -320,7 +305,7 @@ class UserProfileApiTest extends TestCase
 
         // Verify both profiles exist
         $profileResponse = $this->makeRequest('GET', "{$this->baseUrl}/users/me", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $profileResponse['status']);
@@ -337,27 +322,22 @@ class UserProfileApiTest extends TestCase
     public function testRegistrationCapturesExperience(): void
     {
         $suffix = $this->makeUniqueSuffix();
+        $session = $this->createAuthSession('experience.crew', "Exp{$suffix}", 'Crew');
+        $cookie = $this->sessionCookie($session['token']);
 
         $response = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
-            'email' => $this->makeUniqueEmail('experience.crew'),
-            'password' => 'TestPass123',
             'accountType' => 'crew',
             'profile' => [
                 'displayName' => "Exp Crew {$suffix}",
-                'firstName' => "Exp{$suffix}",
-                'lastName' => "Crew",
                 'skill' => 1,
                 'experience' => 'CANSail 1, 2 seasons racing at NSC',
             ],
-        ]);
+        ], [$cookie]);
 
         $this->assertEquals(201, $response['status']);
         $userId = $response['body']['data']['user']['id'] ?? null;
-        $token = $response['body']['data']['token'];
 
-        $profileResponse = $this->makeRequest('GET', "{$this->baseUrl}/users/me", null, [
-            "Authorization: Bearer {$token}",
-        ]);
+        $profileResponse = $this->makeRequest('GET', "{$this->baseUrl}/users/me", null, [$cookie]);
 
         $this->assertEquals(200, $profileResponse['status']);
         $crew = $profileResponse['body']['data']['crewProfile'];
@@ -375,7 +355,7 @@ class UserProfileApiTest extends TestCase
                 'experience' => 'Competent Crew course, club racing since 2022',
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
@@ -392,22 +372,19 @@ class UserProfileApiTest extends TestCase
         $suffix = $this->makeUniqueSuffix();
 
         // Register with experience set
+        $session = $this->createAuthSession('clear.experience', "ClearExp{$suffix}", 'Crew');
+        $token = $session['token'];
         $registerResponse = $this->makeRequest('POST', "{$this->baseUrl}/auth/register", [
-            'email' => $this->makeUniqueEmail('clear.experience'),
-            'password' => 'TestPass123',
             'accountType' => 'crew',
             'profile' => [
                 'displayName' => "Clear Exp {$suffix}",
-                'firstName' => "ClearExp{$suffix}",
-                'lastName' => "Crew",
                 'skill' => 1,
                 'experience' => 'Some initial experience',
             ],
-        ]);
+        ], [$this->sessionCookie($token)]);
 
         $this->assertEquals(201, $registerResponse['status']);
         $userId = $registerResponse['body']['data']['user']['id'] ?? null;
-        $token = $registerResponse['body']['data']['token'];
 
         // Clear experience by sending an empty string
         $patchResponse = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me", [
@@ -415,14 +392,14 @@ class UserProfileApiTest extends TestCase
                 'experience' => '',
             ],
         ], [
-            "Authorization: Bearer {$token}",
+            "Cookie: sc_session={$token}",
         ]);
 
         $this->assertEquals(200, $patchResponse['status']);
 
         // Verify experience is now null
         $profileResponse = $this->makeRequest('GET', "{$this->baseUrl}/users/me", null, [
-            "Authorization: Bearer {$token}",
+            "Cookie: sc_session={$token}",
         ]);
 
         $this->assertEquals(200, $profileResponse['status']);
@@ -443,7 +420,7 @@ class UserProfileApiTest extends TestCase
                 'skill' => 0, // NOVICE
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         $this->assertEquals(200, $response1['status']);
 
@@ -452,7 +429,7 @@ class UserProfileApiTest extends TestCase
                 'skill' => 2, // ADVANCED
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         $this->assertEquals(200, $response2['status']);
 
@@ -462,7 +439,7 @@ class UserProfileApiTest extends TestCase
                 'skill' => -1,
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         // May return 400 (validation) or 500 (enum constraint violation)
         $this->assertContains($response3['status'], [400, 500]);
@@ -472,7 +449,7 @@ class UserProfileApiTest extends TestCase
                 'skill' => 3,
             ],
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         $this->assertContains($response4['status'], [400, 500]);
 
@@ -487,7 +464,7 @@ class UserProfileApiTest extends TestCase
                 'maxBerths' => 100,
             ],
         ], [
-            "Authorization: Bearer {$testDataBoat['token']}",
+            "Cookie: sc_session={$testDataBoat['token']}",
         ]);
         // May accept or reject depending on validation rules
         $this->assertContains($response5['status'], [200, 400]);
@@ -499,7 +476,7 @@ class UserProfileApiTest extends TestCase
                 'maxBerths' => 5,
             ],
         ], [
-            "Authorization: Bearer {$testDataBoat['token']}",
+            "Cookie: sc_session={$testDataBoat['token']}",
         ]);
         $this->assertEquals(400, $response6['status']);
 

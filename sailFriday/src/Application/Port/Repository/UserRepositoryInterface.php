@@ -32,6 +32,14 @@ interface UserRepositoryInterface
     public function findByEmail(string $email): ?User;
 
     /**
+     * Find user by sailConnect (auth service) user ID
+     *
+     * @param string $authUserId Auth user ID
+     * @return User|null User entity or null if not linked
+     */
+    public function findByAuthUserId(string $authUserId): ?User;
+
+    /**
      * Check if email already exists
      *
      * @param string $email Email address to check

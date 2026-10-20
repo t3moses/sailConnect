@@ -14,7 +14,7 @@ declare(strict_types=1);
  *     'path' => '/api/endpoint',
  *     'controller' => ControllerClass::class,
  *     'action' => 'methodName',
- *     'auth' => true|false  // Whether authentication is required
+ *     'auth' => true|false|'identity'  // true: signed-in Sail Friday user; 'identity': any signed-in sailConnect user
  * ]
  */
 
@@ -71,31 +71,15 @@ return [
         'path' => '/api/auth/register',
         'controller' => AuthController::class,
         'action' => 'register',
-        'auth' => false,
+        'auth' => 'identity', // signed-in sailConnect user without a Sail Friday account yet
     ],
 
     [
-        'method' => 'POST',
-        'path' => '/api/auth/login',
+        'method' => 'GET',
+        'path' => '/api/auth/identity',
         'controller' => AuthController::class,
-        'action' => 'login',
-        'auth' => false,
-    ],
-
-    [
-        'method' => 'POST',
-        'path' => '/api/auth/forgot-password',
-        'controller' => AuthController::class,
-        'action' => 'forgotPassword',
-        'auth' => false,
-    ],
-
-    [
-        'method' => 'POST',
-        'path' => '/api/auth/reset-password',
-        'controller' => AuthController::class,
-        'action' => 'resetPassword',
-        'auth' => false,
+        'action' => 'getIdentity',
+        'auth' => 'identity',
     ],
 
     [
@@ -103,14 +87,6 @@ return [
         'path' => '/api/auth/session',
         'controller' => AuthController::class,
         'action' => 'getSession',
-        'auth' => true,
-    ],
-
-    [
-        'method' => 'POST',
-        'path' => '/api/auth/logout',
-        'controller' => AuthController::class,
-        'action' => 'logout',
         'auth' => true,
     ],
 

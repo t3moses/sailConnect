@@ -11,11 +11,8 @@ use App\Application\Exception\EventNotFoundException;
 use App\Application\Exception\FlotillaNotFoundException;
 use App\Application\Exception\BlackoutWindowException;
 use App\Application\Exception\CrewInactiveException;
-use App\Application\Exception\InvalidCredentialsException;
-use App\Application\Exception\InvalidResetTokenException;
 use App\Application\Exception\UserAlreadyExistsException;
 use App\Application\Exception\InvalidTokenException;
-use App\Application\Exception\WeakPasswordException;
 use App\Application\Exception\UnauthorizedException;
 use App\Presentation\Response\JsonResponse;
 use Psr\Log\LoggerInterface;
@@ -79,10 +76,7 @@ class ErrorHandlerMiddleware
         }
 
         // Authentication errors (401 Unauthorized)
-        if (
-            $e instanceof InvalidCredentialsException ||
-            $e instanceof InvalidTokenException
-        ) {
+        if ($e instanceof InvalidTokenException) {
             $this->logger->warning('http.auth_failure', [
                 'exception_class' => get_class($e),
                 'message'         => $e->getMessage(),
@@ -101,22 +95,6 @@ class ErrorHandlerMiddleware
         // Lock timeout / concurrent update (409 Conflict)
         if ($e instanceof \RuntimeException && $e->getCode() === 409) {
             return JsonResponse::error($e->getMessage(), 409);
-        }
-
-        // Weak password (400 Bad Request)
-        if ($e instanceof WeakPasswordException) {
-            $this->logger->info('http.weak_password', [
-                'message' => $e->getMessage(),
-            ]);
-            return JsonResponse::error($e->getMessage(), 400);
-        }
-
-        // Invalid password reset token (400 Bad Request)
-        if ($e instanceof InvalidResetTokenException) {
-            $this->logger->info('http.invalid_reset_token', [
-                'message' => $e->getMessage(),
-            ]);
-            return JsonResponse::error($e->getMessage(), 400);
         }
 
         // Unauthorized access (403 Forbidden)

@@ -15,7 +15,7 @@ vendor/bin/phinx migrate
 
 # 3. Configure environment
 cp .env.example .env
-# Edit .env and set JWT_SECRET (minimum 32 characters)
+# Set up the sailConnect auth service in ../auth first (see docs/SSO.md)
 
 # 4. Start development server
 php -S localhost:8000 -t public
@@ -52,7 +52,7 @@ curl http://localhost:8000/api/events
 - **Language:** PHP 8.1+
 - **Database:** SQLite with Phinx migrations
 - **Architecture:** Clean Architecture (Hexagonal/Ports and Adapters)
-- **API Style:** REST/JSON with JWT authentication
+- **API Style:** REST/JSON with sailConnect single sign-on (session cookie)
 - **Testing:** PHPUnit for unit and integration tests
 - **Migrations:** Phinx for database schema management
 
@@ -85,7 +85,7 @@ curl http://localhost:8000/api/events
 - Critical algorithms (Selection, Assignment, Ranking)
 
 📡 **[API Reference](docs/API.md)** - Complete API endpoint documentation
-- Authentication (JWT tokens)
+- Authentication (sailConnect single sign-on)
 - Public endpoints (events)
 - Authenticated endpoints (availability, assignments, profile)
 - Admin endpoints (notifications, configuration)
@@ -187,13 +187,12 @@ After every user input (registration or availability update), Sail Friday runs t
 - Legacy codebase preserved in `legacy/` folder
 - Selection and Assignment algorithms preserved character-for-character
 - Comprehensive test suite (unit + integration)
-- REST API with JWT authentication
+- REST API with sailConnect single sign-on
 - Database migrations with Phinx
 
-✅ **Phase 8 Complete** - JWT Authentication & User Management
-- User registration with secure password hashing
-- JWT token-based authentication
-- Login/logout functionality
+✅ **Phase 8 Complete** - Authentication & User Management
+- Shared sailConnect single sign-on (see [docs/SSO.md](docs/SSO.md))
+- Enrollment of signed-in sailConnect users as crew or boat owner
 - Protected API endpoints
 
 ✅ **Phase 9 Complete** - Frontend Application
@@ -307,9 +306,8 @@ Key environment variables (set in `.env` file):
 # Database
 DB_PATH=database/sailFriday.db
 
-# JWT Authentication (REQUIRED)
-JWT_SECRET=your-secret-key-minimum-32-characters-long
-JWT_EXPIRATION_MINUTES=60
+# sailConnect single sign-on (defaults to ../auth)
+#AUTH_DIR=/path/to/sailConnect/auth
 
 # SMTP Email Configuration
 SMTP_HOST=email-smtp.ca-central-1.amazonaws.com

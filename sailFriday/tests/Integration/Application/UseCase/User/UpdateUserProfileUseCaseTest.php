@@ -6,10 +6,8 @@ namespace Tests\Integration\Application\UseCase\User;
 
 use App\Application\DTO\Request\UpdateProfileRequest;
 use App\Application\Exception\ValidationException;
-use App\Application\Exception\WeakPasswordException;
 use App\Application\Port\Service\EmailServiceInterface;
 use App\Application\Port\Service\EmailTemplateServiceInterface;
-use App\Application\Port\Service\PasswordServiceInterface;
 use App\Application\UseCase\User\GetUserProfileUseCase;
 use App\Application\UseCase\User\UpdateUserProfileUseCase;
 use App\Domain\Enum\SkillLevel;
@@ -24,7 +22,7 @@ use Psr\Log\NullLogger;
  * Integration tests for UpdateUserProfileUseCase
  *
  * Tests the complete profile update workflow including:
- * - User account updates (email, password)
+ * - Rejection of email/password changes (owned by sailConnect)
  * - Crew profile updates (display name, mobile, skill, etc.)
  * - Boat profile updates (display name, mobile, berths, etc.)
  * - Validation scenarios
@@ -37,7 +35,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
     private UserRepository $userRepository;
     private CrewRepository $crewRepository;
     private BoatRepository $boatRepository;
-    private PasswordServiceInterface $passwordService;
 
     protected function setUp(): void
     {
@@ -47,9 +44,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         $this->userRepository = new UserRepository();
         $this->crewRepository = new CrewRepository();
         $this->boatRepository = new BoatRepository();
-
-        // Initialize password service mock
-        $this->passwordService = $this->createPasswordServiceMock();
 
         // Initialize use cases
         $this->getUserProfileUseCase = new GetUserProfileUseCase(
@@ -62,7 +56,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
             $this->userRepository,
             $this->crewRepository,
             $this->boatRepository,
-            $this->passwordService,
             $this->getUserProfileUseCase,
             $this->createMock(EmailServiceInterface::class),
             $this->createMock(EmailTemplateServiceInterface::class),
@@ -72,29 +65,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
     }
 
     // ==================== HELPER METHODS ====================
-
-    /**
-     * Create password service mock with default behavior
-     */
-    protected function createPasswordServiceMock(): PasswordServiceInterface
-    {
-        $mock = $this->createMock(PasswordServiceInterface::class);
-
-        // Default: all passwords meet requirements
-        $mock->method('meetsRequirements')->willReturn(true);
-
-        // Hash any password to a bcrypt-style hash
-        $mock->method('hash')->willReturnCallback(
-            fn(string $password) => password_hash($password, PASSWORD_BCRYPT)
-        );
-
-        // Default requirements message
-        $mock->method('getRequirementsMessage')->willReturn(
-            'Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character.'
-        );
-
-        return $mock;
-    }
 
     /**
      * Create test user with optional crew/boat profile (extends base class method)
@@ -228,40 +198,47 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
 
     // ==================== HAPPY PATH TESTS ====================
 
-    public function testUpdateEmailOnly(): void
+    public function testEmailChangeIsRejectedBecauseSailConnectOwnsIt(): void
     {
-        // Arrange
         $userId = $this->createTestUser('original@example.com');
-        $request = new UpdateProfileRequest(
-            email: 'updated@example.com'
-        );
+        $request = new UpdateProfileRequest(email: 'updated@example.com');
 
-        // Act
-        $response = $this->useCase->execute($userId, $request);
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Email address is managed in your sailConnect account');
 
-        // Assert
-        $this->assertEquals('updated@example.com', $response->user->email);
-        $this->assertEquals('updated@example.com', $this->getUserEmail($userId));
+        $this->useCase->execute($userId, $request);
     }
 
-    public function testUpdatePasswordOnly(): void
+    public function testPasswordChangeIsRejectedBecauseSailConnectOwnsIt(): void
     {
-        // Arrange
         $userId = $this->createTestUser();
+        $request = new UpdateProfileRequest(password: 'NewSecurePass123!');
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Password is managed in your sailConnect account');
+
+        $this->useCase->execute($userId, $request);
+    }
+
+    public function testIdentityOwnedCrewFieldsAreIgnored(): void
+    {
+        $userId = $this->createTestUser('crew@example.com', 'crew', createCrewProfile: true);
+        $before = $this->crewRepository->findByUserId($userId);
         $request = new UpdateProfileRequest(
-            password: 'NewSecurePass123!'
+            crewProfile: [
+                'firstName' => 'Changed',
+                'lastName' => 'Name',
+                'membershipNumber' => '99999',
+                'mobile' => '555-1212',
+            ]
         );
 
-        // Act
         $response = $this->useCase->execute($userId, $request);
 
-        // Assert
-        $this->assertNotNull($response->user);
-        // Verify password was hashed and saved
-        $stmt = $this->pdo->prepare('SELECT password_hash FROM users WHERE id = ?');
-        $stmt->execute([$userId]);
-        $hash = $stmt->fetchColumn();
-        $this->assertTrue(password_verify('NewSecurePass123!', $hash));
+        $this->assertSame($before->getFirstName(), $response->crewProfile->firstName);
+        $this->assertSame($before->getLastName(), $response->crewProfile->lastName);
+        $this->assertSame($before->getMembershipNumber(), $response->crewProfile->membershipNumber);
+        $this->assertSame('555-1212', $response->crewProfile->mobile);
     }
 
     public function testUpdateCrewProfileOnly(): void
@@ -274,7 +251,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
                 'mobile' => '555-9999',
                 'skill' => SkillLevel::ADVANCED->value,
                 'socialPreference' => false,
-                'membershipNumber' => '99999',
             ]
         );
 
@@ -286,37 +262,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         $this->assertEquals('Updated Crew Name', $response->crewProfile->displayName);
         $this->assertEquals('555-9999', $response->crewProfile->mobile);
         $this->assertEquals(SkillLevel::ADVANCED->value, $response->crewProfile->skill);
-        $this->assertEquals('99999', $response->crewProfile->membershipNumber);
-    }
-
-    public function testUpdateCrewProfileWithQualifyingMembershipNumberSetsRankMembershipToOne(): void
-    {
-        // Arrange
-        $userId = $this->createTestUser('crew@example.com', 'crew', createCrewProfile: true);
-        $request = new UpdateProfileRequest(
-            crewProfile: ['membershipNumber' => '123456'] // 6 digits: qualifying
-        );
-
-        // Act
-        $this->useCase->execute($userId, $request);
-
-        // Assert
-        $this->assertSame(1, $this->getCrewRankMembership($userId));
-    }
-
-    public function testUpdateCrewProfileWithNonQualifyingMembershipNumberSetsRankMembershipToZero(): void
-    {
-        // Arrange
-        $userId = $this->createTestUser('crew@example.com', 'crew', createCrewProfile: true);
-        $request = new UpdateProfileRequest(
-            crewProfile: ['membershipNumber' => 'abc'] // Non-numeric: non-qualifying
-        );
-
-        // Act
-        $this->useCase->execute($userId, $request);
-
-        // Assert
-        $this->assertSame(0, $this->getCrewRankMembership($userId));
     }
 
     public function testUpdateBoatProfileOnly(): void
@@ -346,13 +291,11 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         $this->assertTrue($response->boatProfile->assistanceRequired);
     }
 
-    public function testUpdateUserAccountAndCrewProfile(): void
+    public function testUpdateCrewProfileWithDisplayNameAndMobile(): void
     {
         // Arrange
         $userId = $this->createTestUser('user@example.com', 'crew', createCrewProfile: true);
         $request = new UpdateProfileRequest(
-            email: 'newemail@example.com',
-            password: 'NewPass123!',
             crewProfile: [
                 'displayName' => 'New Display Name',
                 'mobile' => '555-7777'
@@ -363,18 +306,15 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         $response = $this->useCase->execute($userId, $request);
 
         // Assert
-        $this->assertEquals('newemail@example.com', $response->user->email);
         $this->assertEquals('New Display Name', $response->crewProfile->displayName);
         $this->assertEquals('555-7777', $response->crewProfile->mobile);
     }
 
-    public function testUpdateUserAccountAndBoatProfile(): void
+    public function testUpdateBoatProfileWithDisplayNameAndBerths(): void
     {
         // Arrange
         $userId = $this->createTestUser('boat@example.com', 'boat_owner', createBoatProfile: true);
         $request = new UpdateProfileRequest(
-            email: 'newboat@example.com',
-            password: 'NewPass123!',
             boatProfile: [
                 'displayName' => 'New Boat Name',
                 'minBerths' => 4
@@ -385,7 +325,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         $response = $this->useCase->execute($userId, $request);
 
         // Assert
-        $this->assertEquals('newboat@example.com', $response->user->email);
         $this->assertEquals('New Boat Name', $response->boatProfile->displayName);
         $this->assertEquals(4, $response->boatProfile->minBerths);
     }
@@ -398,8 +337,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         $this->createBoatProfileForUser($userId);
 
         $request = new UpdateProfileRequest(
-            email: 'flexupdated@example.com',
-            password: 'NewFlexPass123!',
             crewProfile: [
                 'displayName' => 'Flex Crew',
                 'skill' => SkillLevel::ADVANCED->value
@@ -414,104 +351,11 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         $response = $this->useCase->execute($userId, $request);
 
         // Assert
-        $this->assertEquals('flexupdated@example.com', $response->user->email);
         $this->assertEquals('Flex Crew', $response->crewProfile->displayName);
         $this->assertEquals('Flex Boat', $response->boatProfile->displayName);
     }
 
-    public function testUpdateEmailToSameEmail(): void
-    {
-        // Arrange
-        $userId = $this->createTestUser('same@example.com');
-        $request = new UpdateProfileRequest(
-            email: 'same@example.com' // Same email
-        );
-
-        // Act
-        $response = $this->useCase->execute($userId, $request);
-
-        // Assert
-        $this->assertEquals('same@example.com', $response->user->email);
-    }
-
     // ==================== VALIDATION TESTS ====================
-
-    public function testInvalidEmailFormatThrowsValidationException(): void
-    {
-        // Arrange
-        $userId = $this->createTestUser();
-        $request = new UpdateProfileRequest(
-            email: 'invalid-email-format' // Missing @
-        );
-
-        // Assert
-        $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('Invalid email format');
-
-        // Act
-        $this->useCase->execute($userId, $request);
-    }
-
-    public function testPasswordTooShortThrowsValidationException(): void
-    {
-        // Arrange
-        $userId = $this->createTestUser();
-        $request = new UpdateProfileRequest(
-            password: 'short' // Less than 8 characters
-        );
-
-        // Assert
-        $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('Password must be at least 8 characters');
-
-        // Act
-        $this->useCase->execute($userId, $request);
-    }
-
-    public function testEmptyPasswordIsIgnored(): void
-    {
-        // Arrange
-        $userId = $this->createTestUser();
-        $originalHash = $this->pdo->prepare('SELECT password_hash FROM users WHERE id = ?');
-        $originalHash->execute([$userId]);
-        $originalPasswordHash = $originalHash->fetchColumn();
-
-        $request = new UpdateProfileRequest(
-            email: 'newemail@example.com', // Need at least one valid update
-            password: '' // Empty password should be ignored
-        );
-
-        // Act
-        $response = $this->useCase->execute($userId, $request);
-
-        // Assert - Email updated but password unchanged
-        $this->assertEquals('newemail@example.com', $response->user->email);
-
-        $stmt = $this->pdo->prepare('SELECT password_hash FROM users WHERE id = ?');
-        $stmt->execute([$userId]);
-        $newPasswordHash = $stmt->fetchColumn();
-
-        // Password should remain unchanged
-        $this->assertEquals($originalPasswordHash, $newPasswordHash);
-    }
-
-    public function testEmailAlreadyTakenThrowsValidationException(): void
-    {
-        // Arrange
-        $user1Id = $this->createTestUser('user1@example.com');
-        $user2Id = $this->createTestUser('user2@example.com');
-
-        $request = new UpdateProfileRequest(
-            email: 'user2@example.com' // Email already taken by user2
-        );
-
-        // Assert
-        $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('Email already exists');
-
-        // Act
-        $this->useCase->execute($user1Id, $request);
-    }
 
     public function testNoUpdatesProvidedThrowsValidationException(): void
     {
@@ -570,7 +414,7 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         // Arrange
         $nonExistentUserId = 99999;
         $request = new UpdateProfileRequest(
-            email: 'test@example.com'
+            crewProfile: ['mobile' => '555-0000']
         );
 
         // Assert
@@ -579,43 +423,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
 
         // Act
         $this->useCase->execute($nonExistentUserId, $request);
-    }
-
-    public function testWeakPasswordThrowsWeakPasswordException(): void
-    {
-        // Arrange
-        $userId = $this->createTestUser();
-
-        // Configure password service to reject this password
-        $this->passwordService = $this->createMock(PasswordServiceInterface::class);
-        $this->passwordService->method('meetsRequirements')->willReturn(false);
-        $this->passwordService->method('getRequirementsMessage')->willReturn(
-            'Password must contain uppercase, lowercase, number, and special character'
-        );
-
-        // Recreate use case with new password service
-        $this->useCase = new UpdateUserProfileUseCase(
-            $this->userRepository,
-            $this->crewRepository,
-            $this->boatRepository,
-            $this->passwordService,
-            $this->getUserProfileUseCase,
-            $this->createMock(EmailServiceInterface::class),
-            $this->createMock(EmailTemplateServiceInterface::class),
-            'admin@example.com',
-            new NullLogger()
-        );
-
-        $request = new UpdateProfileRequest(
-            password: 'weakpass' // Weak password
-        );
-
-        // Assert
-        $this->expectException(WeakPasswordException::class);
-        $this->expectExceptionMessage('uppercase, lowercase, number, and special character');
-
-        // Act
-        $this->useCase->execute($userId, $request);
     }
 
     public function testUpdateCrewProfileWithNullOptionalFields(): void
@@ -760,30 +567,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         // Assert
         $this->assertEquals('555-2222', $response->boatProfile->ownerMobile);
         $this->assertEquals($originalDisplayName, $response->boatProfile->displayName);
-    }
-
-    public function testPasswordHashingBehavior(): void
-    {
-        // Arrange
-        $userId = $this->createTestUser();
-        $plainPassword = 'MyNewPassword123!';
-        $request = new UpdateProfileRequest(
-            password: $plainPassword
-        );
-
-        // Act
-        $this->useCase->execute($userId, $request);
-
-        // Assert - Verify password was hashed
-        $stmt = $this->pdo->prepare('SELECT password_hash FROM users WHERE id = ?');
-        $stmt->execute([$userId]);
-        $hash = $stmt->fetchColumn();
-
-        // Verify raw password NOT stored
-        $this->assertNotEquals($plainPassword, $hash);
-
-        // Verify hash can be verified
-        $this->assertTrue(password_verify($plainPassword, $hash));
     }
 
 }

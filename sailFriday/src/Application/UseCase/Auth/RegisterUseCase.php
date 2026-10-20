@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace App\Application\UseCase\Auth;
 
 use App\Application\DTO\Request\RegisterRequest;
-use App\Application\DTO\Response\AuthResponse;
 use App\Application\DTO\Response\UserResponse;
 use App\Application\Exception\UserAlreadyExistsException;
 use App\Application\Exception\ValidationException;
-use App\Application\Exception\WeakPasswordException;
 use App\Application\Port\Repository\BoatRepositoryInterface;
 use App\Application\Port\Repository\CrewRepositoryInterface;
 use App\Application\Port\Repository\EventRepositoryInterface;
@@ -17,8 +15,6 @@ use App\Application\Port\Repository\UserRepositoryInterface;
 use App\Application\Port\Service\CalendarServiceInterface;
 use App\Application\Port\Service\EmailServiceInterface;
 use App\Application\Port\Service\EmailTemplateServiceInterface;
-use App\Application\Port\Service\PasswordServiceInterface;
-use App\Application\Port\Service\TokenServiceInterface;
 use App\Application\Port\Service\TransactionServiceInterface;
 use Psr\Log\LoggerInterface;
 use App\Domain\Entity\Boat;
@@ -33,8 +29,9 @@ use App\Domain\Enum\SkillLevel;
 /**
  * Register Use Case
  *
- * Handles user registration with crew or boat_owner account type.
- * Creates user account and associated crew or boat profile in a single transaction.
+ * Enrolls a signed-in sailConnect user in Sail Friday as a crew member or boat owner.
+ * Credentials, names and membership come from the sailConnect identity (auth service); this
+ * creates the local user record linked to it plus the crew or boat profile, in one transaction.
  */
 class RegisterUseCase
 {
@@ -42,8 +39,6 @@ class RegisterUseCase
         private UserRepositoryInterface $userRepository,
         private CrewRepositoryInterface $crewRepository,
         private BoatRepositoryInterface $boatRepository,
-        private PasswordServiceInterface $passwordService,
-        private TokenServiceInterface $tokenService,
         private RankingService $rankingService,
         private EmailServiceInterface $emailService,
         private EmailTemplateServiceInterface $emailTemplateService,
@@ -58,13 +53,14 @@ class RegisterUseCase
     /**
      * Execute registration
      *
-     * @param RegisterRequest $request Registration request
-     * @return AuthResponse Authentication response with token
+     * @param RegisterRequest $request Registration request (account type and profile)
+     * @param array $identity Signed-in sailConnect identity (user_id, email_address, first_name,
+     *                        last_name, is_member, membership_number)
+     * @return UserResponse The new Sail Friday user
      * @throws ValidationException If validation fails
-     * @throws UserAlreadyExistsException If email already exists
-     * @throws WeakPasswordException If password doesn't meet requirements
+     * @throws UserAlreadyExistsException If the identity is already enrolled or the email is taken
      */
-    public function execute(RegisterRequest $request): AuthResponse
+    public function execute(RegisterRequest $request, array $identity): UserResponse
     {
         // Validate request
         $errors = $request->validate();
@@ -72,25 +68,22 @@ class RegisterUseCase
             throw new ValidationException($errors);
         }
 
-        // Check if email already exists
-        if ($this->userRepository->emailExists($request->email)) {
-            throw new UserAlreadyExistsException($request->email);
+        $email = strtolower((string)$identity['email_address']);
+        $alreadyEnrolled = $this->userRepository->findByAuthUserId((string)$identity['user_id']) !== null;
+        if ($alreadyEnrolled || $this->userRepository->emailExists($email)) {
+            throw new UserAlreadyExistsException($email);
         }
 
-        // Validate password strength
-        if (!$this->passwordService->meetsRequirements($request->password)) {
-            throw new WeakPasswordException($this->passwordService->getRequirementsMessage());
-        }
+        // Names and membership are owned by sailConnect and always override the submitted profile
+        $request = $request->withIdentity($identity);
 
-        // Hash password
-        $passwordHash = $this->passwordService->hash($request->password);
-
-        // Create user entity
+        // Credentials live in sailConnect; the local hash column is unused
         $user = new User(
-            email: $request->email,
-            passwordHash: $passwordHash,
+            email: $email,
+            passwordHash: '',
             accountType: $request->accountType,
             isAdmin: false,
+            authUserId: (string)$identity['user_id'],
         );
 
         // Begin transaction to ensure atomic creation of user and profile
@@ -126,20 +119,7 @@ class RegisterUseCase
         $this->sendAdminNotification($user, $request, $resolvedDisplayName);
         $this->sendWelcomeEmail($user, $resolvedDisplayName);
 
-        // Generate JWT token
-        $token = $this->tokenService->generate(
-            $user->getId(),
-            $user->getEmail(),
-            $user->getAccountType(),
-            $user->isAdmin()
-        );
-
-        // Create response
-        return new AuthResponse(
-            token: $token,
-            user: UserResponse::fromEntity($user),
-            expiresIn: $this->tokenService->getExpirationMinutes() * 60, // Convert to seconds
-        );
+        return UserResponse::fromEntity($user);
     }
 
     private function parseYesNo(mixed $value): bool

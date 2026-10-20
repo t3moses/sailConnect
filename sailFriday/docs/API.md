@@ -63,111 +63,90 @@ All endpoint paths in this documentation are relative to the base URL.
 
 ## Authentication
 
-Most endpoints require JWT (JSON Web Token) authentication.
+Sail Friday uses the shared **sailConnect single sign-on** (see [SSO.md](SSO.md)). Users sign in, sign out,
+register and reset passwords at the auth service (`https://auth.sailConnect.org`). That sets an `HttpOnly`
+session cookie (`sc_session`) on the parent domain, and the browser sends it to every API request
+automatically. There are no bearer tokens.
 
-### Obtaining a Token
+- Not signed in (or the session expired after the inactivity limit): `401` with `details.code = "authentication_required"`.
+  Send the user to `https://auth.sailConnect.org/signin?return=<page url>`.
+- Signed in to sailConnect but no Sail Friday account yet: `403` with `details.code = "enrollment_required"`.
+  Send the user to the enrollment page and call `POST /api/auth/register` (below).
+- Email address, password, first/last name and membership number are edited in the sailConnect account, not here.
 
-#### Register a New Account
+### Enroll the Signed-in User
 
-**POST /api/auth/register**
+**POST /api/auth/register** (any signed-in sailConnect user)
 
 Request Body:
 ```json
 {
-  "email": "user@example.com",
-  "password": "your_secure_password",
   "accountType": "crew",
   "profile": {
-    "firstName": "John",
-    "lastName": "Doe",
     "skill": 1,
-    "mobile": "555-1234"
+    "mobile": "555-1234",
+    "experience": "CANSail 1"
   }
 }
 ```
 
 **Parameters:**
-- `email` (string, required): User email address
-- `password` (string, required): Password (minimum 8 characters)
-- `accountType` (string, required): Either "boat" or "crew"
+- `accountType` (string, required): Either "boat_owner" or "crew"
 - `profile` (object, required): Account-specific profile data
-  - For crew: `firstName`, `lastName`, `skill` (0=Novice, 1=Intermediate, 2=Advanced)
-  - For boat: `displayName`, `ownerFirstName`, `ownerLastName`, `minBerths`, `maxBerths`
+  - For crew: `skill` (0=Novice, 1=Competent crew, 2=Competent first mate), optional `mobile`, `socialPreference`, `experience`
+  - For boat owners: `displayName` (boat name), `minBerths`, `maxBerths`, optional `ownerMobile`, `assistanceRequired`, `socialPreference`, `willingToCrew`
+  - Names and membership number are taken from the sailConnect account; any submitted values are ignored.
 
-Response:
+Response (`201`):
 ```json
 {
   "success": true,
   "data": {
-    "token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-    "user": {
-      "id": 1,
+    "user": { "id": 1, "email": "user@example.com", "accountType": "crew", "isAdmin": false },
+    "message": "Registration successful"
+  }
+}
+```
+
+`409` if the user is already enrolled.
+
+### Get the sailConnect Identity
+
+**GET /api/auth/identity** (any signed-in sailConnect user, enrolled or not)
+
+```json
+{
+  "success": true,
+  "data": {
+    "identity": {
       "email": "user@example.com",
-      "accountType": "crew"
+      "firstName": "John",
+      "lastName": "Doe",
+      "displayName": "JohnD",
+      "isMember": true,
+      "membershipNumber": "7001-1234"
     }
   }
 }
 ```
 
-#### Login with Existing Account
+### Using the Session
 
-**POST /api/auth/login**
-
-Request Body:
-```json
-{
-  "email": "user@example.com",
-  "password": "your_password"
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-    "user": {
-      "id": 1,
-      "email": "user@example.com",
-      "accountType": "crew",
-      "isAdmin": false
-    }
-  }
-}
-```
-
-### Using the Token
-
-Include the token in the `Authorization` header for authenticated requests:
-
-```http
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
-```
-
-**Example with curl:**
+**Example with curl** (copy the `sc_session` cookie value from your browser's developer tools):
 ```bash
 curl -X GET "http://localhost:8000/api/users/me" \
-  -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc..."
+  -b "sc_session=YOUR_SESSION_COOKIE"
 ```
 
-**Example with JavaScript:**
+**Example with JavaScript** (same-site, so the cookie is sent automatically):
 ```javascript
-const token = localStorage.getItem('jaws_token');
-
-fetch('/api/users/me', {
-    headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-    }
-});
+fetch('/api/users/me', { credentials: 'same-origin' });
 ```
 
-### Token Expiration
+### Session Expiration
 
-Tokens expire after 60 minutes by default (configurable via `JWT_EXPIRATION_MINUTES` environment variable).
-
-When a token expires, you'll receive a 401 Unauthorized response. Simply login again to get a new token.
+Sessions end on sign-off (at any sailConnect application), after `INACTIVITY_EXPIRY_MINUTES` without a request
+(configured in the auth service's `.env`), at the maximum session age, or when a platform admin deactivates the account.
 
 ---
 
@@ -272,7 +251,7 @@ curl -X GET "http://localhost:8000/api/events/Fri%20May%2029"
 
 ## Authenticated Endpoints
 
-These endpoints require a valid JWT token in the Authorization header.
+These endpoints require a signed-in sailConnect user with a Sail Friday account (session cookie).
 
 ### PATCH /api/users/me/availability
 
@@ -281,7 +260,7 @@ Update your availability for sailing events. The endpoint auto-detects whether y
 **Request:**
 ```bash
 curl -X PATCH "http://localhost:8000/api/users/me/availability" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -b "sc_session=YOUR_SESSION_COOKIE" \
   -H "Content-Type: application/json" \
   -d '{
     "availabilities": {
@@ -376,7 +355,7 @@ Get your crew assignments across all events.
 **Request:**
 ```bash
 curl -X GET "http://localhost:8000/api/assignments" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  -b "sc_session=YOUR_SESSION_COOKIE"
 ```
 
 **Response:**
@@ -424,7 +403,7 @@ boat owner can only flag crew genuinely assigned to their own boat.
 **Request:**
 ```bash
 curl -X POST "http://localhost:8000/api/assignments/crew-flags" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -b "sc_session=YOUR_SESSION_COOKIE" \
   -H "Content-Type: application/json" \
   -d '{
     "flags": [
@@ -463,7 +442,7 @@ Get all flotillas for all events.
 **Request:**
 ```bash
 curl -X GET "http://localhost:8000/api/flotillas" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  -b "sc_session=YOUR_SESSION_COOKIE"
 ```
 
 **Response:**
@@ -493,7 +472,7 @@ Get your current availability status across all events.
 **Request:**
 ```bash
 curl -X GET "http://localhost:8000/api/users/me/availability" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  -b "sc_session=YOUR_SESSION_COOKIE"
 ```
 
 **Response:**
@@ -519,7 +498,7 @@ Get your user profile (boat owner or crew).
 **Request:**
 ```bash
 curl -X GET "http://localhost:8000/api/users/me" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  -b "sc_session=YOUR_SESSION_COOKIE"
 ```
 
 **Response (Crew Member):**
@@ -571,7 +550,7 @@ Add a new profile (after registration, create boat or crew profile).
 **Request (Crew):**
 ```bash
 curl -X POST "http://localhost:8000/api/users/me" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -b "sc_session=YOUR_SESSION_COOKIE" \
   -H "Content-Type: application/json" \
   -d '{
     "accountType": "crew",
@@ -588,7 +567,7 @@ curl -X POST "http://localhost:8000/api/users/me" \
 **Request (Boat):**
 ```bash
 curl -X POST "http://localhost:8000/api/users/me" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -b "sc_session=YOUR_SESSION_COOKIE" \
   -H "Content-Type: application/json" \
   -d '{
     "accountType": "boat",
@@ -624,7 +603,7 @@ Update your user profile.
 **Request:**
 ```bash
 curl -X PATCH "http://localhost:8000/api/users/me" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -b "sc_session=YOUR_SESSION_COOKIE" \
   -H "Content-Type: application/json" \
   -d '{
     "profile": {
@@ -660,7 +639,7 @@ Get current session information.
 **Request:**
 ```bash
 curl -X GET "http://localhost:8000/api/auth/session" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  -b "sc_session=YOUR_SESSION_COOKIE"
 ```
 
 **Response:**
@@ -680,29 +659,16 @@ curl -X GET "http://localhost:8000/api/auth/session" \
 
 ---
 
-### POST /api/auth/logout
+### Sign out
 
-Logout and invalidate the JWT token.
-
-**Request:**
-```bash
-curl -X POST "http://localhost:8000/api/auth/logout" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Logged out successfully"
-}
-```
+Sign-out is handled by the auth service: send the browser to `https://auth.sailConnect.org/signout?return=<page url>`.
+This ends the session for every sailConnect application. There is no `/api/auth/logout` endpoint.
 
 ---
 
 ## Admin Endpoints
 
-These endpoints require admin privileges (JWT token with `is_admin: true`).
+These endpoints require a Sail Friday admin (`users.is_admin`).
 
 ### GET /api/admin/matching/{eventId}
 
@@ -711,7 +677,7 @@ Get matching data for an event (available boats, crews, capacity analysis).
 **Request:**
 ```bash
 curl -X GET "http://localhost:8000/api/admin/matching/Fri%20May%2029" \
-  -H "Authorization: Bearer ADMIN_JWT_TOKEN"
+  -b "sc_session=ADMIN_SESSION_COOKIE"
 ```
 
 **Response:**
@@ -738,7 +704,7 @@ Send email notifications for an event to all assigned crew.
 **Request:**
 ```bash
 curl -X POST "http://localhost:8000/api/admin/notifications/Fri%20May%2029" \
-  -H "Authorization: Bearer ADMIN_JWT_TOKEN" \
+  -b "sc_session=ADMIN_SESSION_COOKIE" \
   -H "Content-Type: application/json"
 ```
 
@@ -762,7 +728,7 @@ Update season configuration (event times, blackout windows, etc.).
 **Request:**
 ```bash
 curl -X PATCH "http://localhost:8000/api/admin/config" \
-  -H "Authorization: Bearer ADMIN_JWT_TOKEN" \
+  -b "sc_session=ADMIN_SESSION_COOKIE" \
   -H "Content-Type: application/json" \
   -d '{
     "year": 2026,
@@ -921,33 +887,26 @@ Sail Friday includes a Postman collection for easy API testing.
 
 ### Using cURL
 
-**Example: Register and Get Profile**
+**Example: Enroll and Get Profile**
+
+Sign in at the auth service in a browser first, then copy the `sc_session` cookie value
+(developer tools -> Application -> Cookies).
 
 ```bash
-# 1. Register new account
-curl -X POST "http://localhost:8000/api/auth/register" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "testpassword123",
-    "accountType": "crew",
-    "profile": {
-      "firstName": "Test",
-      "lastName": "User",
-      "skill": 1
-    }
-  }'
+COOKIE="sc_session=PASTE_VALUE_HERE"
 
-# Save the token from response
-TOKEN="eyJ0eXAiOiJKV1QiLCJhbGc..."
+# 1. Enroll the signed-in sailConnect user as crew (first time only)
+curl -X POST "http://localhost:8000/api/auth/register" \
+  -b "$COOKIE" \
+  -H "Content-Type: application/json" \
+  -d '{"accountType": "crew", "profile": {"skill": 1}}'
 
 # 2. Get profile
-curl -X GET "http://localhost:8000/api/users/me" \
-  -H "Authorization: Bearer $TOKEN"
+curl -X GET "http://localhost:8000/api/users/me" -b "$COOKIE"
 
 # 3. Update availability
 curl -X PATCH "http://localhost:8000/api/users/me/availability" \
-  -H "Authorization: Bearer $TOKEN" \
+  -b "$COOKIE" \
   -H "Content-Type: application/json" \
   -d '{
     "availabilities": {
@@ -957,47 +916,30 @@ curl -X PATCH "http://localhost:8000/api/users/me/availability" \
   }'
 
 # 4. Get assignments
-curl -X GET "http://localhost:8000/api/assignments" \
-  -H "Authorization: Bearer $TOKEN"
+curl -X GET "http://localhost:8000/api/assignments" -b "$COOKIE"
 ```
 
 ### Using JavaScript
 
 **Example: Frontend Integration**
 
+The session cookie is sent automatically on same-site requests.
+
 ```javascript
-// Login
-async function login(email, password) {
-    const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email, password })
-    });
-
-    const data = await response.json();
-
-    if (data.success) {
-        localStorage.setItem('jaws_token', data.data.token);
-        return data.data.user;
-    } else {
-        throw new Error(data.error);
-    }
-}
-
 // Update availability
 async function updateAvailability(availabilities) {
-    const token = localStorage.getItem('jaws_token');
-
     const response = await fetch('/api/users/me/availability', {
         method: 'PATCH',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ availabilities })
     });
+
+    if (response.status === 401) {
+        // Not signed in or session expired: go to the auth service
+        window.location.href = 'https://auth.sailConnect.org/signin?return=' + encodeURIComponent(window.location.href);
+        return;
+    }
 
     const data = await response.json();
 
@@ -1010,14 +952,7 @@ async function updateAvailability(availabilities) {
 
 // Get assignments
 async function getAssignments() {
-    const token = localStorage.getItem('jaws_token');
-
-    const response = await fetch('/api/assignments', {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    });
-
+    const response = await fetch('/api/assignments', { credentials: 'same-origin' });
     const data = await response.json();
 
     if (data.success) {

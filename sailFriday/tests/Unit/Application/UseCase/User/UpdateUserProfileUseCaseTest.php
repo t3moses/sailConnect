@@ -12,7 +12,6 @@ use App\Application\Port\Repository\CrewRepositoryInterface;
 use App\Application\Port\Repository\UserRepositoryInterface;
 use App\Application\Port\Service\EmailServiceInterface;
 use App\Application\Port\Service\EmailTemplateServiceInterface;
-use App\Application\Port\Service\PasswordServiceInterface;
 use App\Application\UseCase\User\GetUserProfileUseCase;
 use App\Application\UseCase\User\UpdateUserProfileUseCase;
 use App\Domain\Entity\Crew;
@@ -27,7 +26,6 @@ class UpdateUserProfileUseCaseTest extends TestCase
     private UserRepositoryInterface $userRepository;
     private CrewRepositoryInterface $crewRepository;
     private BoatRepositoryInterface $boatRepository;
-    private PasswordServiceInterface $passwordService;
     private GetUserProfileUseCase $getUserProfileUseCase;
     private EmailServiceInterface $emailService;
     private UpdateUserProfileUseCase $useCase;
@@ -39,7 +37,6 @@ class UpdateUserProfileUseCaseTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $this->boatRepository = $this->createMock(BoatRepositoryInterface::class);
-        $this->passwordService = $this->createMock(PasswordServiceInterface::class);
         $this->getUserProfileUseCase = $this->createMock(GetUserProfileUseCase::class);
 
         // Stub user lookup required early in execute()
@@ -60,7 +57,6 @@ class UpdateUserProfileUseCaseTest extends TestCase
             $this->userRepository,
             $this->crewRepository,
             $this->boatRepository,
-            $this->passwordService,
             $this->getUserProfileUseCase,
             $this->emailService,
             $this->createMock(EmailTemplateServiceInterface::class),

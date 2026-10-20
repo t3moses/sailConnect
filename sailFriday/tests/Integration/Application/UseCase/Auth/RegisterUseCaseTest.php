@@ -8,7 +8,6 @@ use App\Application\UseCase\Auth\RegisterUseCase;
 use App\Application\DTO\Request\RegisterRequest;
 use App\Application\Exception\UserAlreadyExistsException;
 use App\Application\Exception\ValidationException;
-use App\Application\Exception\WeakPasswordException;
 use App\Application\Port\Service\CalendarServiceInterface;
 use App\Application\Port\Service\EmailServiceInterface;
 use App\Infrastructure\Persistence\SQLite\UserRepository;
@@ -18,8 +17,6 @@ use App\Infrastructure\Persistence\SQLite\EventRepository;
 use App\Infrastructure\Persistence\SQLite\SeasonRepository;
 use App\Infrastructure\Service\DatabaseTransactionService;
 use App\Infrastructure\Service\SystemTimeService;
-use App\Infrastructure\Service\PhpPasswordService;
-use App\Infrastructure\Service\JwtTokenService;
 use App\Domain\Entity\User;
 use App\Domain\Enum\CrewRankDimension;
 use App\Domain\Enum\SkillLevel;
@@ -37,7 +34,6 @@ class RegisterUseCaseTest extends IntegrationTestCase
     private UserRepository $userRepository;
     private CrewRepository $crewRepository;
     private BoatRepository $boatRepository;
-    private PhpPasswordService $passwordService;
     private EmailServiceInterface $emailService;
 
     protected function setUp(): void
@@ -47,8 +43,6 @@ class RegisterUseCaseTest extends IntegrationTestCase
         $this->userRepository = new UserRepository();
         $this->crewRepository = new CrewRepository();
         $this->boatRepository = new BoatRepository();
-        $this->passwordService = new PhpPasswordService();
-        $tokenService = new JwtTokenService();
 
         // We need RankingService for the usecase
         $rankingService = new \App\Domain\Service\RankingService();
@@ -81,8 +75,6 @@ class RegisterUseCaseTest extends IntegrationTestCase
             $this->userRepository,
             $this->crewRepository,
             $this->boatRepository,
-            $this->passwordService,
-            $tokenService,
             $rankingService,
             $this->emailService,
             $emailTemplateService,
@@ -94,11 +86,24 @@ class RegisterUseCaseTest extends IntegrationTestCase
         );
     }
 
-    public function testRegisterCrewWithValidDataReturnsAuthResponse(): void
+    /** The sailConnect identity the signed-in user would have; names and membership mirror the profile. */
+    private function identity(string $email, RegisterRequest $request): array
+    {
+        $p = $request->profile ?? [];
+
+        return [
+            'user_id' => 'auth-' . md5($email),
+            'email_address' => $email,
+            'first_name' => $p['firstName'] ?? $p['ownerFirstName'] ?? 'Test',
+            'last_name' => $p['lastName'] ?? $p['ownerLastName'] ?? 'User',
+            'is_member' => !empty($p['membershipNumber']),
+            'membership_number' => $p['membershipNumber'] ?? null,
+        ];
+    }
+
+    public function testRegisterCrewWithValidDataReturnsUser(): void
     {
         $request = RegisterRequest::fromArray([
-            'email' => 'newcrew@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'John',
@@ -106,21 +111,19 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'skill' => SkillLevel::INTERMEDIATE->value,
             ]
         ]);
+        $identity = $this->identity('newcrew@example.com', $request);
 
-        $response = $this->useCase->execute($request);
+        $response = $this->useCase->execute($request, $identity);
 
-        $this->assertNotNull($response->token);
-        $this->assertNotEmpty($response->token);
-        $this->assertEquals('newcrew@example.com', $response->user->email);
-        $this->assertEquals('crew', $response->user->accountType);
-        $this->assertFalse($response->user->isAdmin);
+        $this->assertGreaterThan(0, $response->id);
+        $this->assertEquals('newcrew@example.com', $response->email);
+        $this->assertEquals('crew', $response->accountType);
+        $this->assertFalse($response->isAdmin);
     }
 
-    public function testRegisterBoatOwnerWithValidDataReturnsAuthResponse(): void
+    public function testRegisterBoatOwnerWithValidDataReturnsUser(): void
     {
         $request = RegisterRequest::fromArray([
-            'email' => 'newboat@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'boat_owner',
             'profile' => [
                 'ownerFirstName' => 'Mary',
@@ -130,19 +133,18 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'ownerMobile' => '555-0000',
             ]
         ]);
+        $identity = $this->identity('newboat@example.com', $request);
 
-        $response = $this->useCase->execute($request);
+        $response = $this->useCase->execute($request, $identity);
 
-        $this->assertNotNull($response->token);
-        $this->assertEquals('newboat@example.com', $response->user->email);
-        $this->assertEquals('boat_owner', $response->user->accountType);
+        $this->assertGreaterThan(0, $response->id);
+        $this->assertEquals('newboat@example.com', $response->email);
+        $this->assertEquals('boat_owner', $response->accountType);
     }
 
     public function testRegisterCrewCreatesCrewProfile(): void
     {
         $request = RegisterRequest::fromArray([
-            'email' => 'crew.profile@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'Alice',
@@ -151,8 +153,9 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'mobile' => '555-1234',
             ]
         ]);
+        $identity = $this->identity('crew.profile@example.com', $request);
 
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Verify crew was created
         $crew = $this->crewRepository->findByName('Alice', 'Wonder');
@@ -168,8 +171,6 @@ class RegisterUseCaseTest extends IntegrationTestCase
     public function testRegisterBoatOwnerCreatesBoatProfile(): void
     {
         $request = RegisterRequest::fromArray([
-            'email' => 'boat.profile@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'boat_owner',
             'profile' => [
                 'ownerFirstName' => 'Tom',
@@ -179,8 +180,9 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'ownerMobile' => '555-5678',
             ]
         ]);
+        $identity = $this->identity('boat.profile@example.com', $request);
 
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
 
         // Verify boat was created
         $boat = $this->boatRepository->findByOwnerName('Tom', 'Ships');
@@ -197,7 +199,7 @@ class RegisterUseCaseTest extends IntegrationTestCase
         // Create first user
         $user = new User(
             email: 'duplicate@example.com',
-            passwordHash: $this->passwordService->hash('Password123'),
+            passwordHash: '',
             accountType: 'crew',
             isAdmin: false
         );
@@ -205,113 +207,38 @@ class RegisterUseCaseTest extends IntegrationTestCase
 
         // Attempt to register with same email
         $request = RegisterRequest::fromArray([
-            'email' => 'duplicate@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'John',
                 'lastName' => 'Sailor',
             ]
         ]);
+        $identity = $this->identity('duplicate@example.com', $request);
 
         $this->expectException(UserAlreadyExistsException::class);
 
-        $this->useCase->execute($request);
-    }
-
-    public function testRegisterWithWeakPasswordThrowsException(): void
-    {
-        $request = RegisterRequest::fromArray([
-            'email' => 'weak@example.com',
-            'password' => 'short',  // Too short
-            'accountType' => 'crew',
-            'profile' => [
-                'firstName' => 'John',
-                'lastName' => 'Sailor',
-            ]
-        ]);
-
-        $this->expectException(ValidationException::class);
-
-        $this->useCase->execute($request);
-    }
-
-    public function testRegisterWithMissingEmailThrowsValidationException(): void
-    {
-        $request = RegisterRequest::fromArray([
-            'email' => '',
-            'password' => 'SecurePassword123',
-            'accountType' => 'crew',
-            'profile' => [
-                'firstName' => 'John',
-                'lastName' => 'Sailor',
-            ]
-        ]);
-
-        $this->expectException(ValidationException::class);
-
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
     }
 
     public function testRegisterWithInvalidAccountTypeThrowsValidationException(): void
     {
         $request = RegisterRequest::fromArray([
-            'email' => 'invalid@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'invalid_type',
             'profile' => [
                 'firstName' => 'John',
                 'lastName' => 'Sailor',
             ]
         ]);
+        $identity = $this->identity('invalid@example.com', $request);
 
         $this->expectException(ValidationException::class);
 
-        $this->useCase->execute($request);
-    }
-
-    public function testRegisterCrewWithMissingFirstNameThrowsValidationException(): void
-    {
-        $request = RegisterRequest::fromArray([
-            'email' => 'missing@example.com',
-            'password' => 'SecurePassword123',
-            'accountType' => 'crew',
-            'profile' => [
-                'firstName' => '',
-                'lastName' => 'Sailor',
-            ]
-        ]);
-
-        $this->expectException(ValidationException::class);
-
-        $this->useCase->execute($request);
-    }
-
-    public function testRegisterBoatWithMissingOwnerNameThrowsValidationException(): void
-    {
-        $request = RegisterRequest::fromArray([
-            'email' => 'missingowner@example.com',
-            'password' => 'SecurePassword123',
-            'accountType' => 'boat_owner',
-            'profile' => [
-                'ownerFirstName' => '',
-                'ownerLastName' => 'Captain',
-                'minBerths' => 4,
-                'maxBerths' => 8,
-                'ownerMobile' => '555-0003',
-            ]
-        ]);
-
-        $this->expectException(ValidationException::class);
-
-        $this->useCase->execute($request);
+        $this->useCase->execute($request, $identity);
     }
 
     public function testRegisterBoatWithInvalidBerthsThrowsValidationException(): void
     {
         $request = RegisterRequest::fromArray([
-            'email' => 'invalidberths@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'boat_owner',
             'profile' => [
                 'ownerFirstName' => 'Tom',
@@ -321,38 +248,16 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'ownerMobile' => '555-0004',
             ]
         ]);
+        $identity = $this->identity('invalidberths@example.com', $request);
 
         $this->expectException(ValidationException::class);
 
-        $this->useCase->execute($request);
-    }
-
-    public function testRegisteredUserCanLogin(): void
-    {
-        // Register
-        $registerRequest = RegisterRequest::fromArray([
-            'email' => 'canlogin@example.com',
-            'password' => 'SecurePassword123',
-            'accountType' => 'crew',
-            'profile' => [
-                'firstName' => 'Login',
-                'lastName' => 'Test',
-            ]
-        ]);
-
-        $this->useCase->execute($registerRequest);
-
-        // Verify user was created and can be found
-        $user = $this->userRepository->findByEmail('canlogin@example.com');
-        $this->assertNotNull($user);
-        $this->assertTrue($this->passwordService->verify('SecurePassword123', $user->getPasswordHash()));
+        $this->useCase->execute($request, $identity);
     }
 
     public function testRegisterCrewWithAllOptionalFields(): void
     {
         $request = RegisterRequest::fromArray([
-            'email' => 'completecrew@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'Complete',
@@ -365,10 +270,11 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'experience' => '10 years sailing',
             ]
         ]);
+        $identity = $this->identity('completecrew@example.com', $request);
 
-        $response = $this->useCase->execute($request);
+        $response = $this->useCase->execute($request, $identity);
 
-        $this->assertNotNull($response->token);
+        $this->assertGreaterThan(0, $response->id);
         $crew = $this->crewRepository->findByName('Complete', 'Sailor');
         $this->assertNotNull($crew);
         $this->assertEquals('555-9999', $crew->getMobile());
@@ -378,8 +284,6 @@ class RegisterUseCaseTest extends IntegrationTestCase
     public function testRegisterBoatWithAllOptionalFields(): void
     {
         $request = RegisterRequest::fromArray([
-            'email' => 'completeboat@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'boat_owner',
             'profile' => [
                 'ownerFirstName' => 'Complete',
@@ -392,10 +296,11 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'socialPreference' => false,
             ]
         ]);
+        $identity = $this->identity('completeboat@example.com', $request);
 
-        $response = $this->useCase->execute($request);
+        $response = $this->useCase->execute($request, $identity);
 
-        $this->assertNotNull($response->token);
+        $this->assertGreaterThan(0, $response->id);
         $boat = $this->boatRepository->findByOwnerName('Complete', 'Owner');
         $this->assertNotNull($boat);
         $this->assertEquals('555-8888', $boat->getOwnerMobile());
@@ -406,38 +311,34 @@ class RegisterUseCaseTest extends IntegrationTestCase
     {
         // Register first crew
         $request1 = RegisterRequest::fromArray([
-            'email' => 'first@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'Duplicate',
                 'lastName' => 'Name',
             ]
         ]);
-        $this->useCase->execute($request1);
+        $identity = $this->identity('first@example.com', $request1);
+        $this->useCase->execute($request1, $identity);
 
         // Try to register second crew with same name
         $request2 = RegisterRequest::fromArray([
-            'email' => 'second@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'Duplicate',
                 'lastName' => 'Name',
             ]
         ]);
+        $identity = $this->identity('second@example.com', $request2);
 
         $this->expectException(ValidationException::class);
 
-        $this->useCase->execute($request2);
+        $this->useCase->execute($request2, $identity);
     }
 
     public function testRegisterBoatWithSameLastInitialGetsUniqueDisplayName(): void
     {
         // Register first boat owner: John Doe → "JohnD"
         $request1 = RegisterRequest::fromArray([
-            'email' => 'john.doe@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'boat_owner',
             'profile' => [
                 'ownerFirstName' => 'John',
@@ -447,12 +348,11 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'ownerMobile' => '555-0001',
             ]
         ]);
-        $this->useCase->execute($request1);
+        $identity = $this->identity('john.doe@example.com', $request1);
+        $this->useCase->execute($request1, $identity);
 
         // Register second boat owner with same first-name + last-initial: John Davidson → "JohnD2"
         $request2 = RegisterRequest::fromArray([
-            'email' => 'john.davidson@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'boat_owner',
             'profile' => [
                 'ownerFirstName' => 'John',
@@ -462,7 +362,8 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'ownerMobile' => '555-0002',
             ]
         ]);
-        $this->useCase->execute($request2);
+        $identity = $this->identity('john.davidson@example.com', $request2);
+        $this->useCase->execute($request2, $identity);
 
         $boat1 = $this->boatRepository->findByOwnerName('John', 'Doe');
         $boat2 = $this->boatRepository->findByOwnerName('John', 'Davidson');
@@ -481,8 +382,6 @@ class RegisterUseCaseTest extends IntegrationTestCase
         // Three owners all generating "JohnD"
         foreach (['Doe', 'Davidson', 'Denver'] as $i => $lastName) {
             $request = RegisterRequest::fromArray([
-                'email' => "john.{$lastName}@example.com",
-                'password' => 'SecurePassword123',
                 'accountType' => 'boat_owner',
                 'profile' => [
                     'ownerFirstName' => 'John',
@@ -492,7 +391,7 @@ class RegisterUseCaseTest extends IntegrationTestCase
                     'ownerMobile' => "555-000{$i}",
                 ]
             ]);
-            $this->useCase->execute($request);
+            $this->useCase->execute($request, $this->identity("john.{$lastName}@example.com", $request));
         }
 
         $this->assertEquals('JohnD', $this->boatRepository->findByOwnerName('John', 'Doe')->getDisplayName());
@@ -504,27 +403,25 @@ class RegisterUseCaseTest extends IntegrationTestCase
     {
         // Register first crew: John Doe → "JohnD"
         $request1 = RegisterRequest::fromArray([
-            'email' => 'john.doe@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'John',
                 'lastName' => 'Doe',
             ]
         ]);
-        $this->useCase->execute($request1);
+        $identity = $this->identity('john.doe@example.com', $request1);
+        $this->useCase->execute($request1, $identity);
 
         // Register second crew with same first-name + last-initial: John Denver → "JohnD2"
         $request2 = RegisterRequest::fromArray([
-            'email' => 'john.denver@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'John',
                 'lastName' => 'Denver',
             ]
         ]);
-        $this->useCase->execute($request2);
+        $identity = $this->identity('john.denver@example.com', $request2);
+        $this->useCase->execute($request2, $identity);
 
         $crew1 = $this->crewRepository->findByName('John', 'Doe');
         $crew2 = $this->crewRepository->findByName('John', 'Denver');
@@ -539,8 +436,6 @@ class RegisterUseCaseTest extends IntegrationTestCase
     {
         // Create some boats first
         $boat1Request = RegisterRequest::fromArray([
-            'email' => 'boat1@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'boat_owner',
             'profile' => [
                 'ownerFirstName' => 'Alice',
@@ -550,11 +445,10 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'ownerMobile' => '555-0001',
             ]
         ]);
-        $this->useCase->execute($boat1Request);
+        $identity = $this->identity('boat1@example.com', $boat1Request);
+        $this->useCase->execute($boat1Request, $identity);
 
         $boat2Request = RegisterRequest::fromArray([
-            'email' => 'boat2@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'boat_owner',
             'profile' => [
                 'ownerFirstName' => 'Bob',
@@ -564,11 +458,10 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'ownerMobile' => '555-0002',
             ]
         ]);
-        $this->useCase->execute($boat2Request);
+        $identity = $this->identity('boat2@example.com', $boat2Request);
+        $this->useCase->execute($boat2Request, $identity);
 
         $boat3Request = RegisterRequest::fromArray([
-            'email' => 'boat3@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'boat_owner',
             'profile' => [
                 'ownerFirstName' => 'Carol',
@@ -578,12 +471,11 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'ownerMobile' => '555-0003',
             ]
         ]);
-        $this->useCase->execute($boat3Request);
+        $identity = $this->identity('boat3@example.com', $boat3Request);
+        $this->useCase->execute($boat3Request, $identity);
 
         // Now register a crew member
         $crewRequest = RegisterRequest::fromArray([
-            'email' => 'newcrew@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'New',
@@ -591,7 +483,8 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'skill' => SkillLevel::NOVICE->value,
             ]
         ]);
-        $this->useCase->execute($crewRequest);
+        $identity = $this->identity('newcrew@example.com', $crewRequest);
+        $this->useCase->execute($crewRequest, $identity);
 
         // Verify crew's whitelist was populated with all boats
         $crew = $this->crewRepository->findByName('New', 'Crew');
@@ -614,8 +507,6 @@ class RegisterUseCaseTest extends IntegrationTestCase
     {
         // Register a crew member when no boats exist
         $crewRequest = RegisterRequest::fromArray([
-            'email' => 'earlybird@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'Early',
@@ -623,7 +514,8 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'skill' => SkillLevel::NOVICE->value,
             ]
         ]);
-        $this->useCase->execute($crewRequest);
+        $identity = $this->identity('earlybird@example.com', $crewRequest);
+        $this->useCase->execute($crewRequest, $identity);
 
         // Verify crew's whitelist is empty
         $crew = $this->crewRepository->findByName('Early', 'Bird');
@@ -638,8 +530,6 @@ class RegisterUseCaseTest extends IntegrationTestCase
     {
         // First, register several crew members
         $crew1Request = RegisterRequest::fromArray([
-            'email' => 'crew1@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'Alice',
@@ -647,11 +537,10 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'skill' => SkillLevel::INTERMEDIATE->value,
             ]
         ]);
-        $this->useCase->execute($crew1Request);
+        $identity = $this->identity('crew1@example.com', $crew1Request);
+        $this->useCase->execute($crew1Request, $identity);
 
         $crew2Request = RegisterRequest::fromArray([
-            'email' => 'crew2@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'Bob',
@@ -659,11 +548,10 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'skill' => SkillLevel::ADVANCED->value,
             ]
         ]);
-        $this->useCase->execute($crew2Request);
+        $identity = $this->identity('crew2@example.com', $crew2Request);
+        $this->useCase->execute($crew2Request, $identity);
 
         $crew3Request = RegisterRequest::fromArray([
-            'email' => 'crew3@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'crew',
             'profile' => [
                 'firstName' => 'Carol',
@@ -671,7 +559,8 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'skill' => SkillLevel::NOVICE->value,
             ]
         ]);
-        $this->useCase->execute($crew3Request);
+        $identity = $this->identity('crew3@example.com', $crew3Request);
+        $this->useCase->execute($crew3Request, $identity);
 
         // Verify crews have empty whitelists initially
         $crew1 = $this->crewRepository->findByName('Alice', 'Crew');
@@ -688,8 +577,6 @@ class RegisterUseCaseTest extends IntegrationTestCase
 
         // Now register a new boat
         $boatRequest = RegisterRequest::fromArray([
-            'email' => 'newboat@example.com',
-            'password' => 'SecurePassword123',
             'accountType' => 'boat_owner',
             'profile' => [
                 'ownerFirstName' => 'David',
@@ -701,7 +588,8 @@ class RegisterUseCaseTest extends IntegrationTestCase
                 'ownerMobile' => '555-0100',
             ]
         ]);
-        $this->useCase->execute($boatRequest);
+        $identity = $this->identity('newboat@example.com', $boatRequest);
+        $this->useCase->execute($boatRequest, $identity);
 
         // Fetch the newly registered boat
         $boat = $this->boatRepository->findByOwnerName('David', 'Captain');
@@ -725,5 +613,21 @@ class RegisterUseCaseTest extends IntegrationTestCase
         $this->assertContains($boatKeyString, $whitelist1);
         $this->assertContains($boatKeyString, $whitelist2);
         $this->assertContains($boatKeyString, $whitelist3);
+    }
+
+    public function testRegisteredUserIsLinkedToSailConnectIdentity(): void
+    {
+        $request = RegisterRequest::fromArray([
+            'accountType' => 'crew',
+            'profile' => ['firstName' => 'Link', 'lastName' => 'Test'],
+        ]);
+        $identity = $this->identity('linked@example.com', $request);
+
+        $this->useCase->execute($request, $identity);
+
+        $user = $this->userRepository->findByAuthUserId($identity['user_id']);
+        $this->assertNotNull($user);
+        $this->assertSame('linked@example.com', $user->getEmail());
+        $this->assertSame('', $user->getPasswordHash(), 'Credentials live in sailConnect, not here');
     }
 }

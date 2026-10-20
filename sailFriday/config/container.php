@@ -14,21 +14,17 @@ declare(strict_types=1);
 use App\Application\Port\Repository\BoatRepositoryInterface;
 use App\Application\Port\Repository\CrewRepositoryInterface;
 use App\Application\Port\Repository\EventRepositoryInterface;
-use App\Application\Port\Repository\PasswordResetTokenRepositoryInterface;
 use App\Application\Port\Repository\SeasonRepositoryInterface;
 use App\Application\Port\Repository\UserRepositoryInterface;
 use App\Application\Port\Service\EmailServiceInterface;
 use App\Application\Port\Service\EmailTemplateServiceInterface;
 use App\Application\Port\Service\CalendarServiceInterface;
 use App\Application\Port\Service\TimeServiceInterface;
-use App\Application\Port\Service\TokenServiceInterface;
-use App\Application\Port\Service\PasswordServiceInterface;
 use App\Application\Port\Service\LockServiceInterface;
 use App\Application\Port\Service\TransactionServiceInterface;
 use App\Infrastructure\Persistence\SQLite\BoatRepository;
 use App\Infrastructure\Persistence\SQLite\CrewRepository;
 use App\Infrastructure\Persistence\SQLite\EventRepository;
-use App\Infrastructure\Persistence\SQLite\PasswordResetTokenRepository;
 use App\Infrastructure\Persistence\SQLite\SeasonRepository;
 use App\Infrastructure\Persistence\SQLite\UserRepository;
 use App\Infrastructure\Service\MailjetEmailService;
@@ -36,8 +32,6 @@ use App\Infrastructure\Service\PhpMailerEmailService;
 use App\Infrastructure\Service\EmailTemplateService;
 use App\Infrastructure\Service\ICalendarService;
 use App\Infrastructure\Service\SystemTimeService;
-use App\Infrastructure\Service\JwtTokenService;
-use App\Infrastructure\Service\PhpPasswordService;
 use App\Infrastructure\Service\DatabaseTransactionService;
 use App\Infrastructure\Service\SQLiteLockService;
 use App\Domain\Service\SelectionService;
@@ -132,10 +126,6 @@ $container->set(UserRepositoryInterface::class, function () {
     return new UserRepository();
 });
 
-$container->set(PasswordResetTokenRepositoryInterface::class, function () {
-    return new PasswordResetTokenRepository();
-});
-
 // Services (External Adapters)
 $container->set(EmailServiceInterface::class, function ($c) use ($config) {
     $env = $config['app']['env'] ?? 'production';
@@ -160,17 +150,6 @@ $container->set(CalendarServiceInterface::class, function () {
 
 $container->set(TimeServiceInterface::class, function ($c) {
     return new SystemTimeService($c->get(SeasonRepositoryInterface::class));
-});
-
-$container->set(TokenServiceInterface::class, function () use ($config) {
-    return new JwtTokenService(
-        $config['jwt']['secret'],
-        $config['jwt']['expiration_minutes']
-    );
-});
-
-$container->set(PasswordServiceInterface::class, function () {
-    return new PhpPasswordService();
 });
 
 $container->set(TransactionServiceInterface::class, function () {
@@ -521,8 +500,6 @@ $container->set(\App\Application\UseCase\Auth\RegisterUseCase::class, function (
         $c->get(UserRepositoryInterface::class),
         $c->get(CrewRepositoryInterface::class),
         $c->get(BoatRepositoryInterface::class),
-        $c->get(PasswordServiceInterface::class),
-        $c->get(TokenServiceInterface::class),
         $c->get(RankingService::class),
         $c->get(EmailServiceInterface::class),
         $c->get(EmailTemplateServiceInterface::class),
@@ -534,45 +511,9 @@ $container->set(\App\Application\UseCase\Auth\RegisterUseCase::class, function (
     );
 });
 
-$container->set(\App\Application\UseCase\Auth\LoginUseCase::class, function ($c) {
-    return new \App\Application\UseCase\Auth\LoginUseCase(
-        $c->get(UserRepositoryInterface::class),
-        $c->get(PasswordServiceInterface::class),
-        $c->get(TokenServiceInterface::class),
-        $c->get(LoggerInterface::class)
-    );
-});
-
 $container->set(\App\Application\UseCase\Auth\GetSessionUseCase::class, function ($c) {
     return new \App\Application\UseCase\Auth\GetSessionUseCase(
         $c->get(UserRepositoryInterface::class)
-    );
-});
-
-$container->set(\App\Application\UseCase\Auth\LogoutUseCase::class, function ($c) {
-    return new \App\Application\UseCase\Auth\LogoutUseCase(
-        $c->get(UserRepositoryInterface::class),
-        $c->get(LoggerInterface::class)
-    );
-});
-
-$container->set(\App\Application\UseCase\Auth\ForgotPasswordUseCase::class, function ($c) use ($config) {
-    return new \App\Application\UseCase\Auth\ForgotPasswordUseCase(
-        $c->get(UserRepositoryInterface::class),
-        $c->get(PasswordResetTokenRepositoryInterface::class),
-        $c->get(EmailServiceInterface::class),
-        $c->get(EmailTemplateServiceInterface::class),
-        $config,
-        $c->get(LoggerInterface::class)
-    );
-});
-
-$container->set(\App\Application\UseCase\Auth\ResetPasswordUseCase::class, function ($c) {
-    return new \App\Application\UseCase\Auth\ResetPasswordUseCase(
-        $c->get(PasswordResetTokenRepositoryInterface::class),
-        $c->get(UserRepositoryInterface::class),
-        $c->get(PasswordServiceInterface::class),
-        $c->get(LoggerInterface::class)
     );
 });
 
@@ -590,7 +531,6 @@ $container->set(\App\Application\UseCase\User\UpdateUserProfileUseCase::class, f
         $c->get(UserRepositoryInterface::class),
         $c->get(CrewRepositoryInterface::class),
         $c->get(BoatRepositoryInterface::class),
-        $c->get(PasswordServiceInterface::class),
         $c->get(\App\Application\UseCase\User\GetUserProfileUseCase::class),
         $c->get(EmailServiceInterface::class),
         $c->get(EmailTemplateServiceInterface::class),
@@ -669,11 +609,7 @@ $container->set(\App\Presentation\Controller\AdminController::class, function ($
 $container->set(\App\Presentation\Controller\AuthController::class, function ($c) {
     return new \App\Presentation\Controller\AuthController(
         $c->get(\App\Application\UseCase\Auth\RegisterUseCase::class),
-        $c->get(\App\Application\UseCase\Auth\LoginUseCase::class),
-        $c->get(\App\Application\UseCase\Auth\GetSessionUseCase::class),
-        $c->get(\App\Application\UseCase\Auth\LogoutUseCase::class),
-        $c->get(\App\Application\UseCase\Auth\ForgotPasswordUseCase::class),
-        $c->get(\App\Application\UseCase\Auth\ResetPasswordUseCase::class)
+        $c->get(\App\Application\UseCase\Auth\GetSessionUseCase::class)
     );
 });
 
@@ -689,9 +625,22 @@ $container->set(\App\Presentation\Controller\UserController::class, function ($c
 // Presentation Layer - Middleware
 // =======================
 
-$container->set(\App\Presentation\Middleware\JwtAuthMiddleware::class, function ($c) {
-    return new \App\Presentation\Middleware\JwtAuthMiddleware(
-        $c->get(TokenServiceInterface::class)
+$container->set(\App\Application\UseCase\Auth\SyncIdentityUseCase::class, function ($c) {
+    return new \App\Application\UseCase\Auth\SyncIdentityUseCase(
+        $c->get(UserRepositoryInterface::class),
+        $c->get(CrewRepositoryInterface::class)
+    );
+});
+
+$container->set(\SailConnect\Auth\Client\SessionVerifier::class, function () use ($config) {
+    return \SailConnect\Auth\Client\SessionVerifier::fromAuthDir($config['auth']['dir']);
+});
+
+$container->set(\App\Presentation\Middleware\AuthSessionMiddleware::class, function ($c) {
+    return new \App\Presentation\Middleware\AuthSessionMiddleware(
+        $c->get(\SailConnect\Auth\Client\SessionVerifier::class),
+        $c->get(UserRepositoryInterface::class),
+        $c->get(\App\Application\UseCase\Auth\SyncIdentityUseCase::class)
     );
 });
 

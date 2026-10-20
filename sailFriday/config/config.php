@@ -46,10 +46,9 @@ return [
         'url' => getenv('APP_URL') ?: 'http://localhost',
     ],
 
-    // JWT Authentication
-    'jwt' => [
-        'secret' => getenv('JWT_SECRET') ?: 'CHANGE_IN_PRODUCTION_MIN_32_CHARS',
-        'expiration_minutes' => (int)(getenv('JWT_EXPIRATION_MINUTES') ?: 60),
+    // sailConnect single sign-on (auth service): directory holding its .env, database and vendor code
+    'auth' => [
+        'dir' => getenv('AUTH_DIR') ?: dirname(__DIR__, 2) . '/auth',
     ],
 
     // CORS (for future frontend)

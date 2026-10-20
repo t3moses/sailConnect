@@ -21,7 +21,7 @@ class AdminApiTest extends TestCase
 
         $eventId = urlencode('Fri May 29');
         $response = $this->makeRequest('GET', "{$this->baseUrl}/admin/matching/{$eventId}", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         // May return 404 if event doesn't exist, which is valid
@@ -38,7 +38,7 @@ class AdminApiTest extends TestCase
 
         $eventId = urlencode('Fri May 29');
         $response = $this->makeRequest('POST', "{$this->baseUrl}/admin/notifications/{$eventId}", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         // May return 404 if event doesn't exist
@@ -61,7 +61,7 @@ class AdminApiTest extends TestCase
             'startTime' => '10:00:00',
             'finishTime' => '18:00:00',
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
@@ -79,7 +79,7 @@ class AdminApiTest extends TestCase
             'start_time' => '10:00:00',
             'finish_time' => '18:00:00',
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
@@ -105,7 +105,7 @@ class AdminApiTest extends TestCase
         $response1 = $this->makeRequest('PATCH', "{$this->baseUrl}/admin/config", [
             'startTime' => 'invalid-time',
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         $this->assertContains($response1['status'], [200, 400]);
         // $this->assertArrayHasKey('error', $response1['body']);
@@ -115,7 +115,7 @@ class AdminApiTest extends TestCase
             'startTime' => '18:00:00',
             'finishTime' => '10:00:00',
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         $this->assertContains($response2['status'], [200, 400]);
 
@@ -123,7 +123,7 @@ class AdminApiTest extends TestCase
         $response3 = $this->makeRequest('PATCH', "{$this->baseUrl}/admin/config", [
             'startDate' => 'not-a-date',
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         $this->assertContains($response3['status'], [200, 400]);
 
@@ -131,7 +131,7 @@ class AdminApiTest extends TestCase
         $response4 = $this->makeRequest('PATCH', "{$this->baseUrl}/admin/config", [
             'blackoutFrom' => -60,
         ], [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
         $this->assertContains($response4['status'], [200, 400]);
 
@@ -155,7 +155,7 @@ class AdminApiTest extends TestCase
         $testData = $this->createTestCrew($this->baseUrl);
 
         $response = $this->makeRequest('GET', "{$this->baseUrl}/admin/users", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(403, $response['status']);
@@ -168,7 +168,7 @@ class AdminApiTest extends TestCase
         $testData = $this->createTestAdmin($this->baseUrl);
 
         $response = $this->makeRequest('GET', "{$this->baseUrl}/admin/users", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
@@ -183,7 +183,7 @@ class AdminApiTest extends TestCase
         $testData = $this->createTestAdmin($this->baseUrl);
 
         $response = $this->makeRequest('GET', "{$this->baseUrl}/admin/users", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
@@ -200,7 +200,7 @@ class AdminApiTest extends TestCase
         $testData = $this->createTestAdmin($this->baseUrl);
 
         $response = $this->makeRequest('GET', "{$this->baseUrl}/admin/users", null, [
-            "Authorization: Bearer {$testData['token']}",
+            "Cookie: sc_session={$testData['token']}",
         ]);
 
         $this->assertEquals(200, $response['status']);
@@ -229,7 +229,7 @@ class AdminApiTest extends TestCase
             'PATCH',
             "{$this->baseUrl}/admin/users/{$adminData['userId']}/admin",
             ['is_admin' => false],
-            ["Authorization: Bearer {$crewData['token']}"]
+            ["Cookie: sc_session={$crewData['token']}"]
         );
 
         $this->assertEquals(403, $response['status']);
@@ -247,7 +247,7 @@ class AdminApiTest extends TestCase
             'PATCH',
             "{$this->baseUrl}/admin/users/{$targetData['userId']}/admin",
             ['is_admin' => true],
-            ["Authorization: Bearer {$adminData['token']}"]
+            ["Cookie: sc_session={$adminData['token']}"]
         );
 
         $this->assertEquals(200, $response['status']);
@@ -268,7 +268,7 @@ class AdminApiTest extends TestCase
             'PATCH',
             "{$this->baseUrl}/admin/users/{$targetData['userId']}/admin",
             ['is_admin' => false],
-            ["Authorization: Bearer {$adminData['token']}"]
+            ["Cookie: sc_session={$adminData['token']}"]
         );
 
         $this->assertEquals(200, $response['status']);
@@ -287,7 +287,7 @@ class AdminApiTest extends TestCase
             'PATCH',
             "{$this->baseUrl}/admin/users/{$adminData['userId']}/admin",
             ['is_admin' => false],
-            ["Authorization: Bearer {$adminData['token']}"]
+            ["Cookie: sc_session={$adminData['token']}"]
         );
 
         $this->assertEquals(400, $response['status']);
@@ -304,7 +304,7 @@ class AdminApiTest extends TestCase
             'PATCH',
             "{$this->baseUrl}/admin/users/999999/admin",
             ['is_admin' => true],
-            ["Authorization: Bearer {$adminData['token']}"]
+            ["Cookie: sc_session={$adminData['token']}"]
         );
 
         $this->assertEquals(404, $response['status']);
@@ -332,7 +332,7 @@ class AdminApiTest extends TestCase
             'POST',
             "{$this->baseUrl}/admin/users/{$adminData['userId']}/deactivate",
             null,
-            ["Authorization: Bearer {$crewData['token']}"]
+            ["Cookie: sc_session={$crewData['token']}"]
         );
 
         $this->assertEquals(403, $response['status']);
@@ -350,7 +350,7 @@ class AdminApiTest extends TestCase
             'POST',
             "{$this->baseUrl}/admin/users/{$crewData['userId']}/deactivate",
             null,
-            ["Authorization: Bearer {$adminData['token']}"]
+            ["Cookie: sc_session={$adminData['token']}"]
         );
 
         $this->assertEquals(200, $response['status']);
@@ -362,7 +362,7 @@ class AdminApiTest extends TestCase
             'GET',
             "{$this->baseUrl}/admin/users/{$crewData['userId']}",
             null,
-            ["Authorization: Bearer {$adminData['token']}"]
+            ["Cookie: sc_session={$adminData['token']}"]
         );
         $this->assertEquals(200, $getResponse['status']);
         $this->assertEquals(0, $getResponse['body']['data']['crew']['rank_commitment']);
@@ -380,7 +380,7 @@ class AdminApiTest extends TestCase
             'POST',
             "{$this->baseUrl}/admin/users/{$boatData['userId']}/deactivate",
             null,
-            ["Authorization: Bearer {$adminData['token']}"]
+            ["Cookie: sc_session={$adminData['token']}"]
         );
 
         $this->assertEquals(400, $response['status']);
@@ -398,7 +398,7 @@ class AdminApiTest extends TestCase
             'POST',
             "{$this->baseUrl}/admin/users/{$adminData['userId']}/deactivate",
             null,
-            ["Authorization: Bearer {$adminData['token']}"]
+            ["Cookie: sc_session={$adminData['token']}"]
         );
 
         $this->assertEquals(400, $response['status']);
@@ -415,7 +415,7 @@ class AdminApiTest extends TestCase
             'POST',
             "{$this->baseUrl}/admin/users/999999/deactivate",
             null,
-            ["Authorization: Bearer {$adminData['token']}"]
+            ["Cookie: sc_session={$adminData['token']}"]
         );
 
         $this->assertEquals(404, $response['status']);
@@ -446,7 +446,7 @@ class AdminApiTest extends TestCase
             'POST',
             "{$this->baseUrl}/admin/users/{$adminData['userId']}/notify",
             ['subject' => 'NSC Sail Friday', 'message' => 'Hello'],
-            ["Authorization: Bearer {$crewData['token']}"]
+            ["Cookie: sc_session={$crewData['token']}"]
         );
 
         $this->assertEquals(403, $response['status']);
@@ -464,7 +464,7 @@ class AdminApiTest extends TestCase
             'POST',
             "{$this->baseUrl}/admin/users/{$crewData['userId']}/notify",
             ['subject' => 'NSC Sail Friday', 'message' => '   '],
-            ["Authorization: Bearer {$adminData['token']}"]
+            ["Cookie: sc_session={$adminData['token']}"]
         );
 
         $this->assertEquals(400, $response['status']);
@@ -482,7 +482,7 @@ class AdminApiTest extends TestCase
             'POST',
             "{$this->baseUrl}/admin/users/999999/notify",
             ['subject' => 'NSC Sail Friday', 'message' => 'Hello'],
-            ["Authorization: Bearer {$adminData['token']}"]
+            ["Cookie: sc_session={$adminData['token']}"]
         );
 
         $this->assertEquals(404, $response['status']);
@@ -499,7 +499,7 @@ class AdminApiTest extends TestCase
             'POST',
             "{$this->baseUrl}/admin/users/{$crewData['userId']}/notify",
             ['subject' => 'NSC Sail Friday', 'message' => 'Please note the schedule change.'],
-            ["Authorization: Bearer {$adminData['token']}"]
+            ["Cookie: sc_session={$adminData['token']}"]
         );
 
         $this->assertEquals(200, $response['status']);

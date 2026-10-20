@@ -58,32 +58,16 @@ To replace the sample frontend with your own:
 
 ## API Integration Example
 
+Sign in happens at the sailConnect auth service (see [SSO.md](SSO.md)); the browser then sends its session
+cookie with every same-site request, so no token handling is needed:
+
 ```javascript
-// Login
-const response = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-        email: 'user@example.com',
-        password: 'password'
-    })
-});
+const profileResponse = await fetch('/api/users/me', { credentials: 'same-origin' });
 
-const data = await response.json();
-const token = data.data.token;
-
-// Store token
-localStorage.setItem('jaws_token', token);
-
-// Use token for authenticated requests
-const profileResponse = await fetch('/api/users/me', {
-    headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-    }
-});
+if (profileResponse.status === 401) {
+    // Not signed in: go to the auth service and come back here afterwards
+    window.location.href = 'https://auth.sailConnect.org/signin?return=' + encodeURIComponent(window.location.href);
+}
 ```
 
 ## Testing the Setup
@@ -125,12 +109,10 @@ const API_BASE = '/api';
 
 ### Authentication
 
-Protected endpoints require a JWT token:
+Protected endpoints require the sailConnect session cookie, which the browser sends automatically:
 
 ```javascript
-headers: {
-    'Authorization': `Bearer ${token}`
-}
+fetch('/api/users/me', { credentials: 'same-origin' });
 ```
 
 ### CORS
@@ -244,7 +226,7 @@ server {
 
 1. Ensure paths start with `/api`
 2. Check CORS configuration
-3. Verify JWT token is included for protected endpoints
+3. Verify you are signed in at the auth service (the `sc_session` cookie is present) for protected endpoints
 
 ### Static Files Not Loading
 
