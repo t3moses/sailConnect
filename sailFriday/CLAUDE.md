@@ -77,7 +77,7 @@ Dependencies flow inward only: `Presentation → Infrastructure → Application 
 Key use cases:
 - `Season/ProcessSeasonUpdateUseCase.php` ⚠️ MAIN PIPELINE — runs after every user action
 - `Season/GenerateFlotillaUseCase.php`
-- `Auth/` — Register (enrolls a signed-in sailConnect user), GetSession, SyncIdentity. Credentials, sign-in/out and password reset live in `../auth`
+- `Auth/` — Register (enrolls a signed-in sailConnect user), GetSession. Credentials, sign-in/out and password reset live in `../auth`
 - `User/` — GetProfile, AddProfile, UpdateProfile
 - `Boat/UpdateBoatAvailabilityUseCase.php`, `Crew/UpdateCrewAvailabilityUseCase.php`
 - `Event/`, `Flotilla/` — CRUD/query use cases
@@ -116,8 +116,8 @@ Key use cases:
 **Location:** `database/sailFriday.db` | **Migrations:** `database/migrations/`
 
 13 tables:
-1. `boats` — display_name, owner_*, capacity, assistance_required, ranking
-2. `crews` — name, partner_key, email, skill, membership_number, ranking, commitment_rank, initial_commitment_rank, active
+1. `boats` — display_name, owner_user_id, capacity, assistance_required, ranking (owner name and mobile are read from the auth database via `boats_full`)
+2. `crews` — partner_key, skill, ranking, commitment_rank, initial_commitment_rank, active (name, mobile and membership number are read from the auth database via `crews_full`)
 3. `events` — event_id, event_date, start/finish_time, status
 4. `boat_availability` — berths per boat per event
 5. `crew_availability` — status (0-1) per crew per event; row absence = withdrawn
@@ -126,11 +126,13 @@ Key use cases:
 8. `crew_whitelist` — crew preferences for specific boats
 9. `season_config` — singleton config (dates, times, blackout windows)
 10. `flotillas` — JSON assignments
-11. `users` — Sail Friday account linked to a sailConnect identity (`auth_user_id`); email, account_type, is_admin. `password_hash` is unused
+11. `users` — Sail Friday account keyed by the sailConnect user ID (`auth_user_id` is the primary key; `crews.user_id` and `boats.owner_user_id` hold it); account_type, is_program_admin. Email and credentials are read from / live in the auth database (`users_full`)
 12. `cron_notifications` — idempotent email tracking, UNIQUE(event_id, type)
 13. `no_shows` — one row per (crew, event) no-show, UNIQUE(crew_id, event_id); source of truth for commitment_rank (see Ranking System)
 
 Features: FK constraints, CASCADE deletes, composite indexes, WAL mode, auto-update triggers.
+
+**Identity data lives in auth, not here.** `sailFriday.db` stores no email, password, name, mobile number or membership number. `Connection` attaches the auth database as schema `auth` and creates temp views `users_full`, `crews_full`, `boats_full` (see `Persistence/SQLite/AuthDatabase.php` and `docs/SSO.md`). Repositories read the views and write the base tables. Tests build an in-memory `auth` schema (`IntegrationTestCase::createIdentity()` / `linkIdentity()`).
 
 ## Ranking System
 
@@ -237,6 +239,7 @@ For each rule: find highest-loss crew → find best-grad swap → swap if improv
 
 **Key env vars:**
 - `AUTH_DIR` — sailConnect auth service directory (default `../auth`)
+- `AUTH_DB_PATH` — optional override of the auth database file (default: `DB_PATH` from `AUTH_DIR/.env`)
 - `DB_PATH` — default: `database/sailFriday.db`
 - `APP_ENV` — production/development
 - `SMTP_*` — email settings

@@ -72,7 +72,7 @@ automatically. There are no bearer tokens.
   Send the user to `https://auth.sailConnect.org/signin?return=<page url>`.
 - Signed in to sailConnect but no Sail Friday account yet: `403` with `details.code = "enrollment_required"`.
   Send the user to the enrollment page and call `POST /api/auth/register` (below).
-- Email address, password, first/last name and membership number are edited in the sailConnect account, not here.
+- Email address, password, first/last name, mobile number and membership number are edited in the sailConnect account, not here.
 
 ### Enroll the Signed-in User
 
@@ -84,7 +84,6 @@ Request Body:
   "accountType": "crew",
   "profile": {
     "skill": 1,
-    "mobile": "555-1234",
     "experience": "CANSail 1"
   }
 }
@@ -93,9 +92,9 @@ Request Body:
 **Parameters:**
 - `accountType` (string, required): Either "boat_owner" or "crew"
 - `profile` (object, required): Account-specific profile data
-  - For crew: `skill` (0=Novice, 1=Competent crew, 2=Competent first mate), optional `mobile`, `socialPreference`, `experience`
-  - For boat owners: `displayName` (boat name), `minBerths`, `maxBerths`, optional `ownerMobile`, `assistanceRequired`, `socialPreference`, `willingToCrew`
-  - Names and membership number are taken from the sailConnect account; any submitted values are ignored.
+  - For crew: `skill` (0=Novice, 1=Competent crew, 2=Competent first mate), optional `socialPreference` (joining the WhatsApp group requires a mobile number in the sailConnect profile), `experience`
+  - For boat owners: `displayName` (boat name), `minBerths`, `maxBerths`, optional `assistanceRequired`, `socialPreference`, `willingToCrew`. The owner needs a mobile number in the sailConnect profile.
+  - Names, mobile number and membership number are taken from the sailConnect account; any submitted values are ignored. A missing required mobile number returns `400` with `profile.ownerMobile` / `profile.mobile`.
 
 Response (`201`):
 ```json
@@ -607,7 +606,6 @@ curl -X PATCH "http://localhost:8000/api/users/me" \
   -H "Content-Type: application/json" \
   -d '{
     "profile": {
-      "mobile": "555-9999",
       "skill": 2
     }
   }'
@@ -623,7 +621,7 @@ curl -X PATCH "http://localhost:8000/api/users/me" \
       "key": "john_doe",
       "firstName": "John",
       "lastName": "Doe",
-      "mobile": "555-9999",
+      "mobile": "555-1234",
       "skill": 2
     }
   }
@@ -668,7 +666,7 @@ This ends the session for every sailConnect application. There is no `/api/auth/
 
 ## Admin Endpoints
 
-These endpoints require a Sail Friday admin (`users.is_admin`).
+These endpoints require a Sail Friday admin (`users.is_program_admin`).
 
 ### GET /api/admin/matching/{eventId}
 
