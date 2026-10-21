@@ -1,2 +1,6 @@
 # Environment files hold secrets; each app commits only its .env.example
 .env
+
+# Server SSH keys and macOS metadata must never be committed
+*.pem
+.DS_Store
