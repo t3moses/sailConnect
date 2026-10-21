@@ -61,6 +61,16 @@ class UserRepositoryTest extends DatabaseTestCase
         $this->assertNull($this->users->find($member['user_id'])['membership_number']);
     }
 
+    public function testMobileNumberIsOptionalAndUpdatable(): void
+    {
+        $u = $this->makeUser('M', 'Obile', null, ['mobile_number' => '613-555-0100']);
+        $this->assertSame('613-555-0100', $u['mobile_number']);
+        $this->assertNull($this->makeUser('N', 'Omobile', null, ['mobile_number' => ''])['mobile_number']);
+
+        $this->users->updateProfile($u['user_id'], ['first_name' => 'M', 'last_name' => 'Obile', 'is_member' => false, 'mobile_number' => '']);
+        $this->assertNull($this->users->find($u['user_id'])['mobile_number']);
+    }
+
     public function testActiveAdminCountIgnoresDeactivatedAdmins(): void
     {
         $a = $this->makeUser('A', 'Admin', null, ['is_platform_admin' => true]);

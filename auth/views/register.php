@@ -1,4 +1,4 @@
-<?php use SailConnect\Auth\View; $e = [View::class, 'e']; $v += ['email_address' => '', 'email_confirm' => '', 'first_name' => '', 'last_name' => '', 'is_member' => false, 'membership_number' => '']; ?>
+<?php use SailConnect\Auth\View; $e = [View::class, 'e']; $v += ['email_address' => '', 'email_confirm' => '', 'first_name' => '', 'last_name' => '', 'is_member' => false, 'membership_number' => '', 'mobile_number' => '']; ?>
 <div class="card">
   <h1>Create your account</h1>
   <p class="hint">One account works across all sailConnect applications.</p>
@@ -9,6 +9,7 @@
     <?= $this->partial('_field', ['name' => 'last_name', 'label' => 'Last name', 'value' => $v['last_name'], 'errors' => $errors, 'autocomplete' => 'family-name']) ?>
     <?= $this->partial('_field', ['name' => 'email_address', 'label' => 'Email address', 'type' => 'email', 'value' => $v['email_address'], 'errors' => $errors, 'autocomplete' => 'email']) ?>
     <?= $this->partial('_field', ['name' => 'email_confirm', 'label' => 'Confirm email address', 'type' => 'email', 'value' => $v['email_confirm'], 'errors' => $errors]) ?>
+    <?= $this->partial('_field', ['name' => 'mobile_number', 'label' => 'Mobile number (optional)', 'type' => 'tel', 'optional' => true, 'value' => $v['mobile_number'], 'errors' => $errors, 'autocomplete' => 'tel']) ?>
     <?= $this->partial('_field', ['name' => 'password', 'label' => 'Password', 'type' => 'password', 'errors' => $errors, 'hint' => $rules, 'autocomplete' => 'new-password']) ?>
     <?= $this->partial('_field', ['name' => 'password_confirm', 'label' => 'Confirm password', 'type' => 'password', 'errors' => $errors, 'autocomplete' => 'new-password']) ?>
 

@@ -28,6 +28,25 @@ class ValidatorTest extends TestCase
         ];
     }
 
+    #[DataProvider('mobileNumbers')]
+    public function testMobileNumbers(string $number, bool $valid): void
+    {
+        $this->assertSame($valid, Validator::mobile($number));
+    }
+
+    public static function mobileNumbers(): array
+    {
+        return [
+            'plain digits' => ['6139811510', true],
+            'hyphenated' => ['613-290-9060', true],
+            'spaced' => ['613 325 4291', true],
+            'international' => ['+1 (613) 325-4291', true],
+            'too short' => ['12345', false],
+            'letters' => ['call me maybe', false],
+            'too long' => ['613981151061398115106', false],
+        ];
+    }
+
     #[DataProvider('membershipNumbers')]
     public function testMembershipNumbers(string $number, bool $valid): void
     {

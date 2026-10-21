@@ -32,7 +32,7 @@ Production: serve `public/` at `auth.sailConnect.org`, set `COOKIE_DOMAIN=.sailC
 require '/path/to/auth/vendor/autoload.php';
 $auth = SailConnect\Auth\Client\SessionVerifier::fromAuthDir('/path/to/auth');
 $user = $auth->requireUser();    // redirects to auth.sailConnect.org/signin?return=... when signed out
-// $user: user_id, email_address, first_name, last_name, display_name, is_member,
+// $user: user_id, email_address, first_name, last_name, display_name, mobile_number, is_member,
 //        membership_number, is_platform_admin, is_platform_active
 ```
 
@@ -46,6 +46,14 @@ signed-in or signed-out navigation synchronously. It is only a hint; the verifie
 
 sailFriday integrates through this library (`../sailFriday/docs/SSO.md`), and migrates existing users with
 `php bin/migrate-users-to-auth.php` there.
+
+Applications on the same server may also read the auth database directly for identity data instead of keeping copies;
+sailFriday attaches it to its own SQLite connection and joins on `users.auth_user_id`.
+
+## Mobile number
+
+Optional. Digits with spaces, hyphens, dots, parentheses and a leading plus, 7 to 20 characters. Collected at registration and
+on the profile page; applications such as sailFriday require it for features that depend on it (boat owners, WhatsApp group).
 
 ## Membership numbers
 

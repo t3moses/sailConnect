@@ -9,11 +9,11 @@ CREATE TABLE users (
     display_name       TEXT NOT NULL COLLATE NOCASE,
     is_member          INTEGER NOT NULL DEFAULT 0,
     membership_number  TEXT,
+    mobile_number      TEXT,
     is_platform_admin  INTEGER NOT NULL DEFAULT 0,
     is_platform_active INTEGER NOT NULL DEFAULT 1,
     terms_accepted_at  TEXT,
     terms_url          TEXT,
-    legacy_ref         TEXT,
     created_at         TEXT NOT NULL,
     updated_at         TEXT NOT NULL,
     CHECK (is_member = 0 OR membership_number IS NOT NULL)

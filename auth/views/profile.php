@@ -1,6 +1,6 @@
 <?php use SailConnect\Auth\View; $e = [View::class, 'e'];
 $notices = ['welcome' => 'Welcome to sailConnect! A confirmation was sent to your email address.', 'saved' => 'Profile saved.', 'password-saved' => 'Password changed. Other devices were signed out.', 'email-sent' => 'Confirmation link sent to the new address. Your email will change once you click it.'];
-$f = $v + ['first_name' => $u['first_name'], 'last_name' => $u['last_name'], 'is_member' => (bool) $u['is_member'], 'membership_number' => (string) $u['membership_number']]; ?>
+$f = $v + ['first_name' => $u['first_name'], 'last_name' => $u['last_name'], 'is_member' => (bool) $u['is_member'], 'membership_number' => (string) $u['membership_number'], 'mobile_number' => (string) $u['mobile_number']]; ?>
 <?php if (!empty($notices[$notice])): ?><p class="notice"><?= $e($notices[$notice]) ?></p><?php endif; ?>
 <div class="card">
   <h1>Your profile</h1>
@@ -9,6 +9,7 @@ $f = $v + ['first_name' => $u['first_name'], 'last_name' => $u['last_name'], 'is
     <input type="hidden" name="csrf" value="<?= $e($csrf) ?>">
     <?= $this->partial('_field', ['name' => 'first_name', 'label' => 'First name', 'value' => $f['first_name'], 'errors' => $errors]) ?>
     <?= $this->partial('_field', ['name' => 'last_name', 'label' => 'Last name', 'value' => $f['last_name'], 'errors' => $errors]) ?>
+    <?= $this->partial('_field', ['name' => 'mobile_number', 'label' => 'Mobile number (optional)', 'type' => 'tel', 'optional' => true, 'value' => $f['mobile_number'], 'errors' => $errors, 'autocomplete' => 'tel']) ?>
     <label class="check"><input type="checkbox" name="is_member" value="1" id="is_member" <?= $f['is_member'] ? 'checked' : '' ?>> I am a club member</label>
     <div id="member_box">
       <label for="membership_number">Membership number</label>

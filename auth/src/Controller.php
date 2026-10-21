@@ -152,6 +152,7 @@ final class Controller
             'last_name' => trim((string) ($_POST['last_name'] ?? '')),
             'is_member' => !empty($_POST['is_member']),
             'membership_number' => trim((string) ($_POST['membership_number'] ?? '')),
+            'mobile_number' => trim((string) ($_POST['mobile_number'] ?? '')),
         ];
         $password = (string) ($_POST['password'] ?? '');
         $errors = Validator::profile($in);
@@ -304,6 +305,7 @@ final class Controller
             'last_name' => trim((string) ($_POST['last_name'] ?? '')),
             'is_member' => !empty($_POST['is_member']),
             'membership_number' => trim((string) ($_POST['membership_number'] ?? '')),
+            'mobile_number' => trim((string) ($_POST['mobile_number'] ?? '')),
         ];
         $errors = Validator::profile($in);
         if ($errors) {

@@ -39,6 +39,12 @@ final class Validator
         return preg_match('/^[A-Za-z0-9][A-Za-z0-9-]{0,19}$/', $n) === 1;
     }
 
+    /** Optional; digits with spaces, hyphens, dots, parentheses and a leading plus, 7 to 20 characters. */
+    public static function mobile(string $n): bool
+    {
+        return preg_match('/^\+?[0-9 ().-]{7,20}$/', $n) === 1 && preg_match_all('/\d/', $n) >= 7;
+    }
+
     /**
      * Validates the fields shared by registration and profile editing.
      *
@@ -56,6 +62,9 @@ final class Validator
         }
         if (!empty($in['is_member']) && !self::membershipNumber((string) ($in['membership_number'] ?? ''))) {
             $errors['membership_number'] = 'Membership number is required for members (letters, digits and hyphens).';
+        }
+        if (($in['mobile_number'] ?? '') !== '' && !self::mobile((string) $in['mobile_number'])) {
+            $errors['mobile_number'] = 'Enter a valid mobile number, or leave it blank.';
         }
         return $errors;
     }

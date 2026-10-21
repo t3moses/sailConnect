@@ -58,7 +58,7 @@ final class UserRepository
 
     /**
      * @param array<string,mixed> $u first_name,last_name,email_address,password_hash,is_member,
-     *                               membership_number, is_platform_admin?, terms_accepted_at?, terms_url?, legacy_ref?
+     *                               membership_number, mobile_number?, is_platform_admin?, terms_accepted_at?, terms_url?
      * @return array<string,mixed> the stored row
      */
     public function create(array $u): array
@@ -71,7 +71,7 @@ final class UserRepository
             $display = $this->uniqueDisplayName($u['first_name'], $u['last_name'], null);
             $st = $this->db->prepare('
                 INSERT INTO users (user_id, email_address, password_hash, first_name, last_name, display_name,
-                    is_member, membership_number, is_platform_admin, terms_accepted_at, terms_url, legacy_ref,
+                    is_member, membership_number, mobile_number, is_platform_admin, terms_accepted_at, terms_url,
                     created_at, updated_at)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ');
@@ -79,8 +79,9 @@ final class UserRepository
             $st->execute([
                 $userId, $u['email_address'], $u['password_hash'], $u['first_name'], $u['last_name'], $display,
                 $isMember, $isMember ? $u['membership_number'] : null,
+                ($u['mobile_number'] ?? '') !== '' ? $u['mobile_number'] : null,
                 !empty($u['is_platform_admin']) ? 1 : 0,
-                $u['terms_accepted_at'] ?? null, $u['terms_url'] ?? null, $u['legacy_ref'] ?? null,
+                $u['terms_accepted_at'] ?? null, $u['terms_url'] ?? null,
                 $u['created_at'] ?? $now, $u['created_at'] ?? $now,
             ]);
             $this->end($tx, true);
@@ -94,7 +95,7 @@ final class UserRepository
     /**
      * Update profile fields. Display name is re-derived when the name changes.
      *
-     * @param array<string,mixed> $f first_name,last_name,is_member,membership_number
+     * @param array<string,mixed> $f first_name,last_name,is_member,membership_number,mobile_number
      */
     public function updateProfile(string $userId, array $f): void
     {
@@ -104,10 +105,11 @@ final class UserRepository
             $isMember = !empty($f['is_member']) ? 1 : 0;
             $this->db->prepare('
                 UPDATE users SET first_name = ?, last_name = ?, display_name = ?, is_member = ?,
-                    membership_number = ?, updated_at = ? WHERE user_id = ?
+                    membership_number = ?, mobile_number = ?, updated_at = ? WHERE user_id = ?
             ')->execute([
                 $f['first_name'], $f['last_name'], $display, $isMember,
-                $isMember ? $f['membership_number'] : null, Database::now(), $userId,
+                $isMember ? $f['membership_number'] : null,
+                ($f['mobile_number'] ?? '') !== '' ? $f['mobile_number'] : null, Database::now(), $userId,
             ]);
             $this->end($tx, true);
         } catch (\Throwable $e) {
