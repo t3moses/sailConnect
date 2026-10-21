@@ -69,3 +69,14 @@ vendor/bin/phpunit
 
 `CLUB_ADMIN_EMAIL`, `INACTIVITY_EXPIRY_MINUTES`, `TERMS_OF_USE_URL` as specified, plus cookie, Turnstile,
 SMTP and seed settings; see `.env.example`.
+
+### Cloudflare Turnstile
+
+Registration is protected by Turnstile. Create a widget in the Cloudflare dashboard (Turnstile) and put its keys in `.env`:
+
+```
+TURNSTILE_SITE_KEY=<your-site-key>
+TURNSTILE_SECRET_KEY=<your-secret-key>
+```
+
+`.env.example` ships Cloudflare's always-pass test keys for development. `.env` is git-ignored: never commit real keys.

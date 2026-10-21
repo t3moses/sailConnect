@@ -1,0 +1,2 @@
+# Environment files hold secrets; each app commits only its .env.example
+.env
