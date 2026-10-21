@@ -40,12 +40,12 @@ class UpdateUserProfileUseCaseTest extends TestCase
         $this->getUserProfileUseCase = $this->createMock(GetUserProfileUseCase::class);
 
         // Stub user lookup required early in execute()
-        $stubUser = new User(email: 'test@example.com', passwordHash: 'hash', accountType: 'crew');
+        $stubUser = new User(email: 'test@example.com', accountType: 'crew');
         $this->userRepository->method('findById')->willReturn($stubUser);
 
         // Stub profile fetch called at the end of execute()
         $stubProfile = new ProfileResponse(
-            user: new UserResponse(id: 1, email: 'test@example.com', accountType: 'crew', isAdmin: false),
+            user: new UserResponse(id: 'user-1', email: 'test@example.com', accountType: 'crew', isAdmin: false),
         );
         $this->getUserProfileUseCase->method('execute')->willReturn($stubProfile);
 
@@ -81,7 +81,7 @@ class UpdateUserProfileUseCaseTest extends TestCase
             experience: $experience,
         );
         $crew->setId(1);
-        $crew->setUserId(1);
+        $crew->setUserId('user-1');
         return $crew;
     }
 
@@ -103,7 +103,7 @@ class UpdateUserProfileUseCaseTest extends TestCase
             crewProfile: ['experience' => 'CANSail 1 and 2, 3 seasons at NSC'],
         );
 
-        $this->useCase->execute(1, $request);
+        $this->useCase->execute('user-1', $request);
 
         $this->assertNotNull($capturedCrew);
         $this->assertEquals('CANSail 1 and 2, 3 seasons at NSC', $capturedCrew->getExperience());
@@ -128,7 +128,7 @@ class UpdateUserProfileUseCaseTest extends TestCase
             crewProfile: ['experience' => ''],
         );
 
-        $this->useCase->execute(1, $request);
+        $this->useCase->execute('user-1', $request);
 
         $this->assertNotNull($capturedCrew);
         $this->assertNull($capturedCrew->getExperience());
@@ -150,7 +150,7 @@ class UpdateUserProfileUseCaseTest extends TestCase
             crewProfile: ['experience' => 'CANSail 1 and 2, 3 seasons at NSC'],
         );
 
-        $this->useCase->execute(1, $request);
+        $this->useCase->execute('user-1', $request);
 
         $this->assertEqualsCanonicalizing(
             ['admin@example.com', 'admin-secondary@example.com'],

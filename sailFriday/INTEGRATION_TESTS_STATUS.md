@@ -70,7 +70,6 @@
 - All optional fields (displayName, mobile, assistanceRequired, etc.) preserved
 
 ### LogoutUseCaseTest (4 tests)
-- Logout updates last_logout timestamp
 - Non-existent user throws RuntimeException
 - Multiple logouts update timestamp each time
 - Other user data preserved during logout
@@ -101,8 +100,6 @@
 ## Key Findings & API Corrections Applied
 
 ### Domain Entity APIs
-- `User.updateLastLogin(DateTimeImmutable)` - not setLastLogin
-- `User.updateLastLogout(DateTimeImmutable)` - not setLastLogout
 - `BoatKey.fromBoatName(displayName)` - not fromName
 - `Boat.requiresAssistance()` - not getAssistanceRequired
 - `Boat` constructor requires non-null `ownerMobile: string`

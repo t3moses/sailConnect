@@ -20,11 +20,10 @@ use Psr\Log\LoggerInterface;
 
 class DeactivateUserUseCaseTest extends TestCase
 {
-    private function createUser(int $id): User
+    private function createUser(string $id): User
     {
         $user = new User(
             email: "user{$id}@example.com",
-            passwordHash: 'hashed_password',
             accountType: 'crew',
             isAdmin: false,
         );
@@ -73,7 +72,7 @@ class DeactivateUserUseCaseTest extends TestCase
 
         $this->expectException(ValidationException::class);
 
-        $useCase->execute(targetUserId: 42, requestingUserId: 42);
+        $useCase->execute(targetUserId: 'user-42', requestingUserId: 'user-42');
     }
 
     public function testThrowsRuntimeExceptionWhenUserNotFound(): void
@@ -81,29 +80,29 @@ class DeactivateUserUseCaseTest extends TestCase
         $userRepository = $this->createMock(UserRepositoryInterface::class);
         $userRepository->expects($this->once())
             ->method('findById')
-            ->with(999)
+            ->with('user-999')
             ->willReturn(null);
 
         $useCase = $this->makeUseCase($userRepository);
 
         $this->expectException(\RuntimeException::class);
 
-        $useCase->execute(targetUserId: 999, requestingUserId: 1);
+        $useCase->execute(targetUserId: 'user-999', requestingUserId: 'user-1');
     }
 
     public function testThrowsValidationExceptionWhenUserHasNoLinkedCrew(): void
     {
         $userRepository = $this->createMock(UserRepositoryInterface::class);
-        $userRepository->method('findById')->with(6)->willReturn($this->createUser(6));
+        $userRepository->method('findById')->with('user-6')->willReturn($this->createUser('user-6'));
 
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
-        $crewRepository->method('findByUserId')->with(6)->willReturn(null);
+        $crewRepository->method('findByUserId')->with('user-6')->willReturn(null);
 
         $useCase = $this->makeUseCase($userRepository, $crewRepository);
 
         $this->expectException(ValidationException::class);
 
-        $useCase->execute(targetUserId: 6, requestingUserId: 1);
+        $useCase->execute(targetUserId: 'user-6', requestingUserId: 'user-1');
     }
 
     public function testDeactivatesCrewWithdrawsFromFutureEventsAndZeroesCommitment(): void
@@ -112,10 +111,10 @@ class DeactivateUserUseCaseTest extends TestCase
         $crew->setRankDimension(CrewRankDimension::COMMITMENT, 2);
 
         $userRepository = $this->createMock(UserRepositoryInterface::class);
-        $userRepository->method('findById')->with(5)->willReturn($this->createUser(5));
+        $userRepository->method('findById')->with('user-5')->willReturn($this->createUser('user-5'));
 
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
-        $crewRepository->method('findByUserId')->with(5)->willReturn($crew);
+        $crewRepository->method('findByUserId')->with('user-5')->willReturn($crew);
         $crewRepository->expects($this->once())
             ->method('deleteAvailabilityForEvents')
             ->with($crew->getKey(), ['2026-06-01', '2026-06-08']);
@@ -133,7 +132,7 @@ class DeactivateUserUseCaseTest extends TestCase
 
         $useCase = $this->makeUseCase($userRepository, $crewRepository, $eventRepository, $transactionService);
 
-        $result = $useCase->execute(targetUserId: 5, requestingUserId: 1);
+        $result = $useCase->execute(targetUserId: 'user-5', requestingUserId: 'user-1');
 
         $this->assertFalse($crew->isActive());
         $this->assertSame(0, $crew->getRank()->getDimension(CrewRankDimension::COMMITMENT));
@@ -146,10 +145,10 @@ class DeactivateUserUseCaseTest extends TestCase
         $crew = $this->createCrew();
 
         $userRepository = $this->createMock(UserRepositoryInterface::class);
-        $userRepository->method('findById')->with(5)->willReturn($this->createUser(5));
+        $userRepository->method('findById')->with('user-5')->willReturn($this->createUser('user-5'));
 
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
-        $crewRepository->method('findByUserId')->with(5)->willReturn($crew);
+        $crewRepository->method('findByUserId')->with('user-5')->willReturn($crew);
         $crewRepository->expects($this->never())->method('deleteAvailabilityForEvents');
         $crewRepository->expects($this->once())->method('updateRankCommitment')->with($crew);
         $crewRepository->expects($this->once())->method('updateActive')->with($crew);
@@ -159,7 +158,7 @@ class DeactivateUserUseCaseTest extends TestCase
 
         $useCase = $this->makeUseCase($userRepository, $crewRepository, $eventRepository);
 
-        $result = $useCase->execute(targetUserId: 5, requestingUserId: 1);
+        $result = $useCase->execute(targetUserId: 'user-5', requestingUserId: 'user-1');
 
         $this->assertFalse($crew->isActive());
         $this->assertSame(0, $crew->getRank()->getDimension(CrewRankDimension::COMMITMENT));
@@ -171,10 +170,10 @@ class DeactivateUserUseCaseTest extends TestCase
         $crew = $this->createCrew();
 
         $userRepository = $this->createMock(UserRepositoryInterface::class);
-        $userRepository->method('findById')->with(7)->willReturn($this->createUser(7));
+        $userRepository->method('findById')->with('user-7')->willReturn($this->createUser('user-7'));
 
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
-        $crewRepository->method('findByUserId')->with(7)->willReturn($crew);
+        $crewRepository->method('findByUserId')->with('user-7')->willReturn($crew);
         $crewRepository->method('updateActive')->willThrowException(new \RuntimeException('db error'));
 
         $eventRepository = $this->createMock(EventRepositoryInterface::class);
@@ -190,6 +189,6 @@ class DeactivateUserUseCaseTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('db error');
 
-        $useCase->execute(targetUserId: 7, requestingUserId: 1);
+        $useCase->execute(targetUserId: 'user-7', requestingUserId: 'user-1');
     }
 }

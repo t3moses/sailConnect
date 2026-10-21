@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Unit\Presentation\Middleware;
 
 use App\Application\Port\Repository\UserRepositoryInterface;
-use App\Application\UseCase\Auth\SyncIdentityUseCase;
 use App\Domain\Entity\User;
 use App\Presentation\Middleware\AuthSessionMiddleware;
 use App\Presentation\Response\JsonResponse;
@@ -35,10 +34,9 @@ class AuthSessionMiddlewareTest extends TestCase
         $verifier = $this->createMock(SessionVerifier::class);
         $verifier->method('currentUser')->willReturn($identity);
         $users = $this->createMock(UserRepositoryInterface::class);
-        $users->method('findByAuthUserId')->willReturn($localUser);
-        $sync = $this->createMock(SyncIdentityUseCase::class);
+        $users->method('findById')->willReturn($localUser);
 
-        return new AuthSessionMiddleware($verifier, $users, $sync);
+        return new AuthSessionMiddleware($verifier, $users);
     }
 
     public function testNoSessionIsUnauthenticated(): void
@@ -63,15 +61,14 @@ class AuthSessionMiddlewareTest extends TestCase
 
     public function testLocalUserYieldsTheLegacyAuthContext(): void
     {
-        $user = new User(email: 'a@example.com', passwordHash: '', accountType: 'crew', isAdmin: true, authUserId: 'auth-1');
-        $user->setId(42);
+        $user = new User(email: 'a@example.com', accountType: 'crew', isAdmin: true, id: 'auth-1');
 
         $context = $this->middleware($this->identity(), $user)->authenticate();
 
-        $this->assertSame(42, $context['user_id']);
+        $this->assertSame('auth-1', $context['user_id']);
         $this->assertSame('crew', $context['account_type']);
         $this->assertTrue($context['is_admin']);
-        $this->assertSame('auth-1', $context['auth_user_id']);
+        $this->assertSame($this->identity(), $context['identity']);
     }
 
     public function testIdentityIsAvailableWithoutALocalAccount(): void

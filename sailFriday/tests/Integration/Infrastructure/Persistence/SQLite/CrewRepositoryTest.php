@@ -37,6 +37,26 @@ class CrewRepositoryTest extends IntegrationTestCase
         $this->userRepository = new UserRepository();
     }
 
+    /**
+     * Save a crew whose name, mobile and membership come from a sailConnect identity,
+     * created (or updated, when the crew already has a user) from the entity's own values
+     */
+    private function saveWithIdentity(Crew $crew): void
+    {
+        $identity = [
+            'first_name' => $crew->getFirstName(),
+            'last_name' => $crew->getLastName(),
+            'mobile_number' => $crew->getMobile(),
+            'membership_number' => $crew->getMembershipNumber(),
+        ];
+        if ($crew->getUserId() === null) {
+            $crew->setUserId($this->createLinkedUser($identity));
+        } else {
+            $this->updateIdentity($crew->getUserId(), $identity);
+        }
+        $this->repository->save($crew);
+    }
+
     public function testSaveInsertsNewCrew(): void
     {
         $crew = new Crew(
@@ -51,7 +71,7 @@ class CrewRepositoryTest extends IntegrationTestCase
             skill: SkillLevel::INTERMEDIATE,
             experience: null
         );
-        $this->repository->save($crew);
+        $this->saveWithIdentity($crew);
 
         $this->assertNotNull($crew->getId());
         $this->assertGreaterThan(0, $crew->getId());
@@ -62,7 +82,7 @@ class CrewRepositoryTest extends IntegrationTestCase
     {
         $key = CrewKey::fromName('Jane', 'Doe');
         $crew = $this->createTestCrew('Jane', 'Doe', SkillLevel::ADVANCED);
-        $this->repository->save($crew);
+        $this->saveWithIdentity($crew);
 
         $foundCrew = $this->repository->findByKey($key);
 
@@ -84,7 +104,7 @@ class CrewRepositoryTest extends IntegrationTestCase
     public function testFindByNameReturnsCrewWhenExists(): void
     {
         $crew = $this->createTestCrew('Alice', 'Wonder', SkillLevel::NOVICE);
-        $this->repository->save($crew);
+        $this->saveWithIdentity($crew);
 
         $foundCrew = $this->repository->findByName('Alice', 'Wonder');
 
@@ -104,7 +124,7 @@ class CrewRepositoryTest extends IntegrationTestCase
         // Create user
         $user = new User(
             email: 'crewuser@example.com',
-            passwordHash: 'hash',
+            id: $this->createIdentity(['email_address' => 'crewuser@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -114,7 +134,7 @@ class CrewRepositoryTest extends IntegrationTestCase
         // Create crew with user ID
         $crew = $this->createTestCrew('Bob', 'Builder', SkillLevel::INTERMEDIATE);
         $crew->setUserId($userId);
-        $this->repository->save($crew);
+        $this->saveWithIdentity($crew);
 
         $foundCrew = $this->repository->findByUserId($userId);
 
@@ -125,7 +145,7 @@ class CrewRepositoryTest extends IntegrationTestCase
 
     public function testFindByUserIdReturnsNullWhenNotExists(): void
     {
-        $result = $this->repository->findByUserId(99999);
+        $result = $this->repository->findByUserId('user-99999');
 
         $this->assertNull($result);
     }
@@ -215,12 +235,12 @@ class CrewRepositoryTest extends IntegrationTestCase
     public function testSaveUpdatesExistingCrew(): void
     {
         $crew = $this->createTestCrew('Charlie', 'Update', SkillLevel::NOVICE);
-        $this->repository->save($crew);
+        $this->saveWithIdentity($crew);
         $crewId = $crew->getId();
 
         // Update skill level
         $crew->setSkill(SkillLevel::ADVANCED);
-        $this->repository->save($crew);
+        $this->saveWithIdentity($crew);
 
         $updatedCrew = $this->repository->findByKey($crew->getKey());
         $this->assertNotNull($updatedCrew);
@@ -231,7 +251,7 @@ class CrewRepositoryTest extends IntegrationTestCase
     public function testDeleteRemovesCrew(): void
     {
         $crew = $this->createTestCrew('Delete', 'Me', SkillLevel::NOVICE);
-        $this->repository->save($crew);
+        $this->saveWithIdentity($crew);
         $key = $crew->getKey();
 
         $this->assertTrue($this->repository->exists($key));
@@ -254,7 +274,7 @@ class CrewRepositoryTest extends IntegrationTestCase
     public function testExistsReturnsTrueForExistingCrew(): void
     {
         $crew = $this->createTestCrew('Exists', 'Test', SkillLevel::INTERMEDIATE);
-        $this->repository->save($crew);
+        $this->saveWithIdentity($crew);
 
         $this->assertTrue($this->repository->exists($crew->getKey()));
     }
@@ -466,18 +486,16 @@ class CrewRepositoryTest extends IntegrationTestCase
             firstName: 'Props',
             lastName: 'Test',
             partnerKey: null,
-            mobile: null,
+            mobile: '555-9999',
             socialPreference: false,
-            membershipNumber: null,
+            membershipNumber: 'MEM-123',
             skill: SkillLevel::ADVANCED,
             experience: null
         );
-        $crew->setMobile('555-9999');
         $crew->setSocialPreference(true);
-        $crew->setMembershipNumber('MEM-123');
         $crew->setExperience('Special notes');
 
-        $this->repository->save($crew);
+        $this->saveWithIdentity($crew);
 
         $foundCrew = $this->repository->findByKey($crew->getKey());
 
@@ -499,7 +517,7 @@ class CrewRepositoryTest extends IntegrationTestCase
         $this->assertTrue($crew->isActive());
 
         $crew->setActive(false);
-        $this->repository->save($crew);
+        $this->saveWithIdentity($crew);
 
         $foundCrew = $this->repository->findByKey($crew->getKey());
         $this->assertFalse($foundCrew->isActive());
@@ -524,9 +542,9 @@ class CrewRepositoryTest extends IntegrationTestCase
         $intermediate = $this->createTestCrew('Intermediate', 'Test', SkillLevel::INTERMEDIATE);
         $advanced = $this->createTestCrew('Advanced', 'Test', SkillLevel::ADVANCED);
 
-        $this->repository->save($novice);
-        $this->repository->save($intermediate);
-        $this->repository->save($advanced);
+        $this->saveWithIdentity($novice);
+        $this->saveWithIdentity($intermediate);
+        $this->saveWithIdentity($advanced);
 
         $this->assertEquals(SkillLevel::NOVICE, $this->repository->findByKey($novice->getKey())->getSkill());
         $this->assertEquals(SkillLevel::INTERMEDIATE, $this->repository->findByKey($intermediate->getKey())->getSkill());
@@ -571,7 +589,7 @@ class CrewRepositoryTest extends IntegrationTestCase
     private function createAndSaveCrew(string $firstName, string $lastName, SkillLevel $skill): Crew
     {
         $crew = $this->createTestCrew($firstName, $lastName, $skill);
-        $this->repository->save($crew);
+        $this->saveWithIdentity($crew);
         return $crew;
     }
 }

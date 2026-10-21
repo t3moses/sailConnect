@@ -111,7 +111,6 @@ class UserProfileApiTest extends TestCase
         $response = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me", [
             'crewProfile' => [
                 'displayName' => "Updated Name {$suffix}",
-                'mobile' => '555-9999',
                 'skill' => 2,
                 'socialPreference' => false,
             ],
@@ -127,7 +126,8 @@ class UserProfileApiTest extends TestCase
 
         // Verify crew profile fields were updated
         $this->assertEquals("Updated Name {$suffix}", $crew['displayName']);
-        $this->assertEquals('555-9999', $crew['mobile']);
+        // Mobile number is read from the sailConnect profile
+        $this->assertEquals(self::AUTH_MOBILE, $crew['mobile']);
         $this->assertEquals(2, $crew['skill']);
         $this->assertFalse($crew['socialPreference']);
 
@@ -143,7 +143,6 @@ class UserProfileApiTest extends TestCase
         $response = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me", [
             'boatProfile' => [
                 'displayName' => "Updated Boat Name {$suffix}",
-                'ownerMobile' => '555-8888',
                 'minBerths' => 3,
                 'maxBerths' => 6,
                 'assistanceRequired' => true,
@@ -161,7 +160,8 @@ class UserProfileApiTest extends TestCase
 
         // Verify boat profile fields were updated
         $this->assertEquals("Updated Boat Name {$suffix}", $boat['displayName']);
-        $this->assertEquals('555-8888', $boat['ownerMobile']);
+        // Mobile number is read from the sailConnect profile
+        $this->assertEquals(self::AUTH_MOBILE, $boat['ownerMobile']);
         $this->assertEquals(3, $boat['minBerths']);
         $this->assertEquals(6, $boat['maxBerths']);
         $this->assertTrue($boat['assistanceRequired']);
@@ -178,7 +178,6 @@ class UserProfileApiTest extends TestCase
 
         $response = $this->makeRequest('PATCH', "{$this->baseUrl}/users/me", [
             'crewProfile' => [
-                'mobile' => '555-4321',
                 'displayName' => "Multi Update {$suffix}",
                 'skill' => 2,
             ],
@@ -193,7 +192,6 @@ class UserProfileApiTest extends TestCase
         $profile = $response['body']['data']['profile'];
 
         // Verify crew profile was updated
-        $this->assertEquals('555-4321', $profile['crewProfile']['mobile']);
         $this->assertEquals("Multi Update {$suffix}", $profile['crewProfile']['displayName']);
         $this->assertEquals(2, $profile['crewProfile']['skill']);
 
@@ -246,11 +244,8 @@ class UserProfileApiTest extends TestCase
         $response = $this->makeRequest('POST', "{$this->baseUrl}/users/me", [
             'profileType' => 'crew',
             'crewProfile' => [
-                'firstName' => "Flex{$suffix}",
-                'lastName' => "Crew",
                 'displayName' => "Flex Crew {$suffix}",
                 'skill' => 1,
-                'mobile' => '555-1111',
                 'socialPreference' => false,
             ],
         ], [
@@ -286,10 +281,7 @@ class UserProfileApiTest extends TestCase
         $response = $this->makeRequest('POST', "{$this->baseUrl}/users/me", [
             'profileType' => 'boat',
             'boatProfile' => [
-                'ownerFirstName' => "Flex{$suffix}",
-                'ownerLastName' => "Boat",
                 'displayName' => "Flex Boat {$suffix}",
-                'ownerMobile' => '555-2222',
                 'minBerths' => 2,
                 'maxBerths' => 4,
                 'assistanceRequired' => false,

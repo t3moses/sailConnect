@@ -62,9 +62,13 @@ class IntegrationTestCaseTest extends IntegrationTestCase
             20260826231116,  // create_no_shows_table
             20260828103827,  // add_initial_commitment_rank_to_crews
             20261020000000,  // link_users_to_auth
+            20261021120000,  // move_identity_to_auth
+            20261021140000,  // rename_users_is_admin
+            20261021150000,  // drop_users_last_login_logout
+            20261021160000,  // use_auth_user_id_as_user_key
         ];
 
-        $this->assertEquals($expected, $versions, 'All 17 migrations should be applied');
+        $this->assertEquals($expected, $versions, 'All 21 migrations should be applied');
     }
 
     public function testSeasonConfigInitialized(): void
@@ -81,17 +85,13 @@ class IntegrationTestCaseTest extends IntegrationTestCase
         $this->assertEquals('18:00:00', $result['blackout_to']);
     }
 
-    public function testLastLogoutColumnExists(): void
+    public function testLoginTimestampColumnsAreGone(): void
     {
-        // Verify migration 20260131 ran successfully
-        $result = $this->pdo->query("PRAGMA table_info(users)")->fetchAll();
-        $columns = array_column($result, 'name');
+        // Sign-in and sign-out belong to sailConnect
+        $columns = array_column($this->pdo->query("PRAGMA table_info(users)")->fetchAll(), 'name');
 
-        $this->assertContains(
-            'last_logout',
-            $columns,
-            'Migration 20260131 should add last_logout column to users table'
-        );
+        $this->assertNotContains('last_login', $columns);
+        $this->assertNotContains('last_logout', $columns);
     }
 
     public function testCrewsDisplayNameNullable(): void
@@ -99,10 +99,10 @@ class IntegrationTestCaseTest extends IntegrationTestCase
         // Verify migration 20260201 ran successfully (nullable constraint)
         // Insert a crew without display_name to test nullability
         $stmt = $this->pdo->prepare("
-            INSERT INTO crews (key, first_name, last_name)
-            VALUES (?, ?, ?)
+            INSERT INTO crews (key)
+            VALUES (?)
         ");
-        $stmt->execute(['test_crew', 'Test', 'Crew']);
+        $stmt->execute(['test_crew']);
 
         $result = $this->pdo->query("
             SELECT display_name FROM crews WHERE key = 'test_crew'
@@ -129,7 +129,6 @@ class IntegrationTestCaseTest extends IntegrationTestCase
             'flotillas',
             'users',
             'locks',
-            'password_reset_tokens',
             'phinxlog'
         ];
 
@@ -160,14 +159,13 @@ class IntegrationTestCaseTest extends IntegrationTestCase
         $userId = $this->createTestUser('test@example.com', 'crew', false);
 
         $result = $this->pdo->query("
-            SELECT * FROM users WHERE id = {$userId}
+            SELECT * FROM users WHERE auth_user_id = '{$userId}'
         ")->fetch();
 
         $this->assertNotEmpty($result);
-        $this->assertEquals('test@example.com', $result['email']);
+        $this->assertNotEmpty($result['auth_user_id']);
         $this->assertEquals('crew', $result['account_type']);
-        $this->assertEquals(0, $result['is_admin']);
-        $this->assertNotEmpty($result['password_hash']);
+        $this->assertEquals(0, $result['is_program_admin']);
     }
 
     public function testCreateTestUserWithAdminFlag(): void
@@ -175,23 +173,32 @@ class IntegrationTestCaseTest extends IntegrationTestCase
         $userId = $this->createTestUser('admin@example.com', 'crew', true);
 
         $result = $this->pdo->query("
-            SELECT is_admin FROM users WHERE id = {$userId}
+            SELECT is_program_admin FROM users WHERE auth_user_id = '{$userId}'
         ")->fetch();
 
-        $this->assertEquals(1, $result['is_admin']);
+        $this->assertEquals(1, $result['is_program_admin']);
     }
 
-    public function testPasswordIsHashedInCreateTestUser(): void
+    public function testCreateTestUserReadsEmailFromAuthDatabase(): void
     {
         $userId = $this->createTestUser('test@example.com');
 
         $result = $this->pdo->query("
-            SELECT password_hash FROM users WHERE id = {$userId}
+            SELECT email FROM users_full WHERE auth_user_id = '{$userId}'
         ")->fetch();
 
-        // Verify it's a bcrypt hash (starts with $2y$)
-        $this->assertStringStartsWith('$2y$', $result['password_hash']);
-        // Verify password_verify works
-        $this->assertTrue(password_verify('TestPass123', $result['password_hash']));
+        $this->assertEquals('test@example.com', $result['email']);
+    }
+
+    public function testSailFridayDoesNotStoreIdentityData(): void
+    {
+        $columns = fn(string $table) => array_column(
+            $this->pdo->query("PRAGMA main.table_info({$table})")->fetchAll(PDO::FETCH_ASSOC),
+            'name'
+        );
+
+        $this->assertEmpty(array_intersect(['email', 'password_hash'], $columns('users')));
+        $this->assertEmpty(array_intersect(['first_name', 'last_name', 'mobile', 'membership_number'], $columns('crews')));
+        $this->assertEmpty(array_intersect(['owner_first_name', 'owner_last_name', 'owner_mobile'], $columns('boats')));
     }
 }

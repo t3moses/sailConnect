@@ -65,14 +65,6 @@ class RegisterUseCaseTest extends TestCase
         $this->crewRepository->method('displayNameExists')->willReturn(false);
         $this->boatRepository->method('displayNameExists')->willReturn(false);
 
-        // Mock user save to set ID
-        $this->userRepository->method('save')->willReturnCallback(function ($user) {
-            // Set user ID after save
-            $reflection = new \ReflectionClass($user);
-            $property = $reflection->getProperty('id');
-            $property->setValue($user, 1);
-        });
-
         // Setup ranking service to return valid ranks
         $this->rankingService->method('calculateCrewRank')->willReturn(
             Rank::forCrew(availability: 0, commitment: 0, membership: 0, absence: 0)
@@ -141,7 +133,7 @@ class RegisterUseCaseTest extends TestCase
 
     /**
      * Build the sailConnect identity the signed-in user would have for this request.
-     * Names and membership come from the identity, so mirror what the test put in the profile.
+     * Names, mobile number and membership come from the identity, so mirror what the test put in the profile.
      */
     private function identity(string $email, RegisterRequest $request): array
     {
@@ -154,6 +146,7 @@ class RegisterUseCaseTest extends TestCase
             'last_name' => $p['lastName'] ?? $p['ownerLastName'] ?? 'User',
             'is_member' => !empty($p['membershipNumber']),
             'membership_number' => $p['membershipNumber'] ?? null,
+            'mobile_number' => $p['mobile'] ?? $p['ownerMobile'] ?? null,
         ];
     }
 
@@ -478,7 +471,7 @@ class RegisterUseCaseTest extends TestCase
 
         // Assert response
         $this->assertNotNull($response);
-        $this->assertSame(1, $response->id);
+        $this->assertSame($identity['user_id'], $response->id);
 
         // Assert admin notification was sent to both the primary and secondary recipients
         foreach (['test-admin@example.com', 'test-admin-secondary@example.com'] as $expectedRecipient) {
@@ -509,6 +502,7 @@ class RegisterUseCaseTest extends TestCase
             profile: [
                 'ownerFirstName' => 'Captain',
                 'ownerLastName' => 'Hook',
+                'ownerMobile' => '555-1111',
                 'displayName' => 'The Jolly Roger',
                 'minBerths' => 2,
                 'maxBerths' => 4,
@@ -521,7 +515,7 @@ class RegisterUseCaseTest extends TestCase
 
         // Assert response
         $this->assertNotNull($response);
-        $this->assertSame(1, $response->id);
+        $this->assertSame($identity['user_id'], $response->id);
 
         // Assert admin notification was sent to both the primary and secondary recipients
         foreach (['test-admin@example.com', 'test-admin-secondary@example.com'] as $expectedRecipient) {
@@ -557,7 +551,7 @@ class RegisterUseCaseTest extends TestCase
 
         // Assert - Registration should still succeed
         $this->assertNotNull($response);
-        $this->assertSame(1, $response->id);
+        $this->assertSame($identity['user_id'], $response->id);
     }
 
     public function testRegistrationSucceedsWhenEmailThrowsException(): void
@@ -584,7 +578,7 @@ class RegisterUseCaseTest extends TestCase
 
         // Assert - Registration should still succeed despite email exception
         $this->assertNotNull($response);
-        $this->assertSame(1, $response->id);
+        $this->assertSame($identity['user_id'], $response->id);
     }
 
     public function testEmailContainsCrewDetailsForCrewRegistration(): void
@@ -715,6 +709,7 @@ class RegisterUseCaseTest extends TestCase
             profile: [
                 'ownerFirstName' => 'John',
                 'ownerLastName' => 'Davidson',
+                'ownerMobile' => '555-1111',
                 'minBerths' => 2,
                 'maxBerths' => 4,
             ]
@@ -859,11 +854,65 @@ class RegisterUseCaseTest extends TestCase
         $this->assertNull($capturedCrew->getMembershipNumber());
     }
 
+    public function testBoatOwnerWithoutMobileInSailConnectProfileIsRejected(): void
+    {
+        $request = new RegisterRequest(
+            accountType: 'boat_owner',
+            // A mobile number in the request body is ignored: only the sailConnect profile counts
+            profile: ['ownerFirstName' => 'No', 'ownerLastName' => 'Phone', 'ownerMobile' => '555-0000', 'minBerths' => 1, 'maxBerths' => 2]
+        );
+        $identity = $this->identity('nophone@example.com', $request);
+        $identity['mobile_number'] = null;
+
+        $this->crewRepository->expects($this->never())->method('save');
+        $this->boatRepository->expects($this->never())->method('save');
+
+        try {
+            $this->useCase->execute($request, $identity);
+            $this->fail('Expected ValidationException');
+        } catch (\App\Application\Exception\ValidationException $e) {
+            $this->assertArrayHasKey('profile.ownerMobile', $e->getErrors());
+        }
+    }
+
+    public function testCrewJoiningWhatsAppWithoutMobileInSailConnectProfileIsRejected(): void
+    {
+        $request = new RegisterRequest(accountType: 'crew', profile: ['socialPreference' => true, 'mobile' => '555-0000']);
+        $identity = $this->identity('nophone@example.com', $request);
+        $identity['mobile_number'] = null;
+
+        $this->crewRepository->expects($this->never())->method('save');
+
+        try {
+            $this->useCase->execute($request, $identity);
+            $this->fail('Expected ValidationException');
+        } catch (\App\Application\Exception\ValidationException $e) {
+            $this->assertArrayHasKey('profile.mobile', $e->getErrors());
+        }
+    }
+
+    public function testCrewMobileComesFromSailConnectNotFromTheRequest(): void
+    {
+        $this->crewRepository->method('findByKey')->willReturn(null);
+        $captured = null;
+        $this->crewRepository->method('save')->willReturnCallback(function (Crew $crew) use (&$captured) {
+            $captured = $crew;
+        });
+
+        $request = new RegisterRequest(accountType: 'crew', profile: ['socialPreference' => true, 'mobile' => '555-0000']);
+        $identity = $this->identity('real@example.com', $request);
+        $identity['mobile_number'] = '613-555-0100';
+
+        $this->useCase->execute($request, $identity);
+
+        $this->assertSame('613-555-0100', $captured->getMobile());
+    }
+
     public function testRejectsIdentityThatIsAlreadyEnrolled(): void
     {
         $userRepository = $this->createMock(UserRepositoryInterface::class);
-        $userRepository->method('findByAuthUserId')->willReturn(
-            new \App\Domain\Entity\User('real@example.com', '', 'crew', false, null, null, null, null, 'auth-1')
+        $userRepository->method('findById')->willReturn(
+            new \App\Domain\Entity\User('real@example.com', 'crew', false, null, null, 'auth-1')
         );
         $useCase = new RegisterUseCase(
             $userRepository, $this->crewRepository, $this->boatRepository, $this->rankingService,

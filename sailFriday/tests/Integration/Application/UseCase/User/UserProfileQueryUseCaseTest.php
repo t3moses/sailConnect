@@ -55,12 +55,12 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('User not found');
 
-        $this->getUserProfileUseCase->execute(999999);
+        $this->getUserProfileUseCase->execute('user-999999');
     }
 
     public function testGetUserProfileReturnsProfileResponse(): void
     {
-        $user = new User('test@example.com', 'hash', 'crew', false);
+        $user = $this->newUser('test@example.com', 'crew', false);
         $this->userRepository->save($user);
 
         $profile = $this->getUserProfileUseCase->execute($user->getId());
@@ -70,7 +70,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
 
     public function testGetUserProfileIncludesUserData(): void
     {
-        $user = new User('test@example.com', 'hash', 'crew', false);
+        $user = $this->newUser('test@example.com', 'crew', false);
         $this->userRepository->save($user);
 
         $profile = $this->getUserProfileUseCase->execute($user->getId());
@@ -83,7 +83,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
 
     public function testGetUserProfileReturnsNullCrewProfileWhenNone(): void
     {
-        $user = new User('nocrewprofile@example.com', 'hash', 'crew', false);
+        $user = $this->newUser('nocrewprofile@example.com', 'crew', false);
         $this->userRepository->save($user);
 
         $profile = $this->getUserProfileUseCase->execute($user->getId());
@@ -93,7 +93,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
 
     public function testGetUserProfileIncludesCrewProfileWhenExists(): void
     {
-        $user = new User('crewuser@example.com', 'hash', 'crew', false);
+        $user = $this->newUser('crewuser@example.com', 'crew', false);
         $this->userRepository->save($user);
 
         $crew = new Crew(
@@ -109,6 +109,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
             experience: null
         );
         $crew->setUserId($user->getId());
+        $this->updateIdentity($user->getId(), ['first_name' => 'John', 'last_name' => 'Sailor', 'mobile_number' => '1234567890', 'membership_number' => 'M123']);
         $this->crewRepository->save($crew);
 
         $profile = $this->getUserProfileUseCase->execute($user->getId());
@@ -122,7 +123,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
 
     public function testGetUserProfileReturnsNullBoatProfileWhenNone(): void
     {
-        $user = new User('noboatprofile@example.com', 'hash', 'boat_owner', false);
+        $user = $this->newUser('noboatprofile@example.com', 'boat_owner', false);
         $this->userRepository->save($user);
 
         $profile = $this->getUserProfileUseCase->execute($user->getId());
@@ -132,7 +133,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
 
     public function testGetUserProfileIncludesBoatProfileWhenExists(): void
     {
-        $user = new User('boatowner@example.com', 'hash', 'boat_owner', false);
+        $user = $this->newUser('boatowner@example.com', 'boat_owner', false);
         $this->userRepository->save($user);
 
         $boat = new Boat(
@@ -147,6 +148,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
             socialPreference: false
         );
         $boat->setOwnerUserId($user->getId());
+        $this->updateIdentity($user->getId(), ['first_name' => 'Boat', 'last_name' => 'Owner', 'mobile_number' => '555-1234']);
         $this->boatRepository->save($boat);
 
         $profile = $this->getUserProfileUseCase->execute($user->getId());
@@ -160,7 +162,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
 
     public function testGetUserProfileIncludesBothCrewAndBoatProfiles(): void
     {
-        $user = new User('both@example.com', 'hash', 'crew', false);
+        $user = $this->newUser('both@example.com', 'crew', false);
         $this->userRepository->save($user);
 
         // Add crew profile
@@ -177,6 +179,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
             experience: null
         );
         $crew->setUserId($user->getId());
+        $this->updateIdentity($user->getId(), ['first_name' => 'Jane', 'last_name' => 'Doe', 'mobile_number' => null, 'membership_number' => 'M456']);
         $this->crewRepository->save($crew);
 
         // Add boat profile
@@ -192,6 +195,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
             socialPreference: false
         );
         $boat->setOwnerUserId($user->getId());
+        $this->updateIdentity($user->getId(), ['first_name' => 'Jane', 'last_name' => 'Doe', 'mobile_number' => '555-5678']);
         $this->boatRepository->save($boat);
 
         $profile = $this->getUserProfileUseCase->execute($user->getId());
@@ -204,7 +208,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
 
     public function testGetUserProfileHandlesAdminUser(): void
     {
-        $user = new User('admin@example.com', 'hash', 'crew', true);
+        $user = $this->newUser('admin@example.com', 'crew', true);
         $this->userRepository->save($user);
 
         $profile = $this->getUserProfileUseCase->execute($user->getId());
@@ -214,7 +218,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
 
     public function testGetUserProfileIncludesCrewMobile(): void
     {
-        $user = new User('crewwithmobile@example.com', 'hash', 'crew', false);
+        $user = $this->newUser('crewwithmobile@example.com', 'crew', false);
         $this->userRepository->save($user);
 
         $crew = new Crew(
@@ -230,6 +234,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
             experience: null
         );
         $crew->setUserId($user->getId());
+        $this->updateIdentity($user->getId(), ['first_name' => 'Bob', 'last_name' => 'Smith', 'mobile_number' => '555-1234', 'membership_number' => 'M789']);
         $this->crewRepository->save($crew);
 
         $profile = $this->getUserProfileUseCase->execute($user->getId());
@@ -240,7 +245,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
 
     public function testGetUserProfileIncludesBoatAssistanceFlag(): void
     {
-        $user = new User('boatneedshelp@example.com', 'hash', 'boat_owner', false);
+        $user = $this->newUser('boatneedshelp@example.com', 'boat_owner', false);
         $this->userRepository->save($user);
 
         $boat = new Boat(
@@ -255,6 +260,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
             socialPreference: false
         );
         $boat->setOwnerUserId($user->getId());
+        $this->updateIdentity($user->getId(), ['first_name' => 'Needs', 'last_name' => 'Help', 'mobile_number' => '555-9999']);
         $this->boatRepository->save($boat);
 
         $profile = $this->getUserProfileUseCase->execute($user->getId());
@@ -264,7 +270,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
 
     public function testGetUserProfileConvertsToArray(): void
     {
-        $user = new User('arraytest@example.com', 'hash', 'crew', false);
+        $user = $this->newUser('arraytest@example.com', 'crew', false);
         $this->userRepository->save($user);
 
         $crew = new Crew(
@@ -280,6 +286,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
             experience: null
         );
         $crew->setUserId($user->getId());
+        $this->updateIdentity($user->getId(), ['first_name' => 'Test', 'last_name' => 'User', 'mobile_number' => null, 'membership_number' => null]);
         $this->crewRepository->save($crew);
 
         $profile = $this->getUserProfileUseCase->execute($user->getId());
@@ -297,10 +304,10 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
     public function testGetUserProfileForMultipleUsers(): void
     {
         // Create multiple users with different profiles
-        $user1 = new User('user1@example.com', 'hash', 'crew', false);
+        $user1 = $this->newUser('user1@example.com', 'crew', false);
         $this->userRepository->save($user1);
 
-        $user2 = new User('user2@example.com', 'hash', 'boat_owner', false);
+        $user2 = $this->newUser('user2@example.com', 'boat_owner', false);
         $this->userRepository->save($user2);
 
         $crew1 = new Crew(
@@ -316,6 +323,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
             experience: null
         );
         $crew1->setUserId($user1->getId());
+        $this->updateIdentity($user1->getId(), ['first_name' => 'User', 'last_name' => 'One', 'mobile_number' => null, 'membership_number' => null]);
         $this->crewRepository->save($crew1);
 
         $boat2 = new Boat(
@@ -330,6 +338,7 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
             socialPreference: false
         );
         $boat2->setOwnerUserId($user2->getId());
+        $this->updateIdentity($user2->getId(), ['first_name' => 'User', 'last_name' => 'Two', 'mobile_number' => '555-2222']);
         $this->boatRepository->save($boat2);
 
         $profile1 = $this->getUserProfileUseCase->execute($user1->getId());
@@ -343,10 +352,10 @@ class UserProfileQueryUseCaseTest extends IntegrationTestCase
 
     public function testGetUserProfileIncludesAccountType(): void
     {
-        $crewUser = new User('crew@example.com', 'hash', 'crew', false);
+        $crewUser = $this->newUser('crew@example.com', 'crew', false);
         $this->userRepository->save($crewUser);
 
-        $boatUser = new User('boat@example.com', 'hash', 'boat_owner', false);
+        $boatUser = $this->newUser('boat@example.com', 'boat_owner', false);
         $this->userRepository->save($boatUser);
 
         $crewProfile = $this->getUserProfileUseCase->execute($crewUser->getId());

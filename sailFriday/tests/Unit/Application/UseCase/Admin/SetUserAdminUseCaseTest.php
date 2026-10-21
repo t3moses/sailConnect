@@ -13,11 +13,10 @@ use Psr\Log\LoggerInterface;
 
 class SetUserAdminUseCaseTest extends TestCase
 {
-    private function createUser(int $id, bool $isAdmin = false): User
+    private function createUser(string $id, bool $isAdmin = false): User
     {
         $user = new User(
             email: "user{$id}@example.com",
-            passwordHash: 'hashed_password',
             accountType: 'crew',
             isAdmin: $isAdmin,
         );
@@ -36,7 +35,7 @@ class SetUserAdminUseCaseTest extends TestCase
 
         $this->expectException(ValidationException::class);
 
-        $useCase->execute(targetUserId: 42, isAdmin: true, requestingUserId: 42);
+        $useCase->execute(targetUserId: 'user-42', isAdmin: true, requestingUserId: 'user-42');
     }
 
     public function testThrowsRuntimeExceptionWhenUserNotFound(): void
@@ -44,7 +43,7 @@ class SetUserAdminUseCaseTest extends TestCase
         $userRepository = $this->createMock(UserRepositoryInterface::class);
         $userRepository->expects($this->once())
             ->method('findById')
-            ->with(999)
+            ->with('user-999')
             ->willReturn(null);
 
         $userRepository->expects($this->never())->method('save');
@@ -53,17 +52,17 @@ class SetUserAdminUseCaseTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
 
-        $useCase->execute(targetUserId: 999, isAdmin: true, requestingUserId: 1);
+        $useCase->execute(targetUserId: 'user-999', isAdmin: true, requestingUserId: 'user-1');
     }
 
     public function testGrantsAdminAndPersists(): void
     {
-        $targetUser = $this->createUser(id: 5, isAdmin: false);
+        $targetUser = $this->createUser(id: 'user-5', isAdmin: false);
 
         $userRepository = $this->createMock(UserRepositoryInterface::class);
         $userRepository->expects($this->once())
             ->method('findById')
-            ->with(5)
+            ->with('user-5')
             ->willReturn($targetUser);
 
         $userRepository->expects($this->once())
@@ -72,7 +71,7 @@ class SetUserAdminUseCaseTest extends TestCase
 
         $useCase = new SetUserAdminUseCase($userRepository, $this->createMock(LoggerInterface::class));
 
-        $result = $useCase->execute(targetUserId: 5, isAdmin: true, requestingUserId: 1);
+        $result = $useCase->execute(targetUserId: 'user-5', isAdmin: true, requestingUserId: 'user-1');
 
         $this->assertTrue($targetUser->isAdmin());
         $this->assertTrue($result['is_admin']);
@@ -80,12 +79,12 @@ class SetUserAdminUseCaseTest extends TestCase
 
     public function testRevokesAdminAndPersists(): void
     {
-        $targetUser = $this->createUser(id: 5, isAdmin: true);
+        $targetUser = $this->createUser(id: 'user-5', isAdmin: true);
 
         $userRepository = $this->createMock(UserRepositoryInterface::class);
         $userRepository->expects($this->once())
             ->method('findById')
-            ->with(5)
+            ->with('user-5')
             ->willReturn($targetUser);
 
         $userRepository->expects($this->once())
@@ -94,7 +93,7 @@ class SetUserAdminUseCaseTest extends TestCase
 
         $useCase = new SetUserAdminUseCase($userRepository, $this->createMock(LoggerInterface::class));
 
-        $result = $useCase->execute(targetUserId: 5, isAdmin: false, requestingUserId: 1);
+        $result = $useCase->execute(targetUserId: 'user-5', isAdmin: false, requestingUserId: 'user-1');
 
         $this->assertFalse($targetUser->isAdmin());
         $this->assertFalse($result['is_admin']);
@@ -102,7 +101,7 @@ class SetUserAdminUseCaseTest extends TestCase
 
     public function testReturnedSummaryContainsExpectedFields(): void
     {
-        $targetUser = $this->createUser(id: 7, isAdmin: false);
+        $targetUser = $this->createUser(id: 'user-7', isAdmin: false);
 
         $userRepository = $this->createMock(UserRepositoryInterface::class);
         $userRepository->method('findById')->willReturn($targetUser);
@@ -110,7 +109,7 @@ class SetUserAdminUseCaseTest extends TestCase
 
         $useCase = new SetUserAdminUseCase($userRepository, $this->createMock(LoggerInterface::class));
 
-        $result = $useCase->execute(targetUserId: 7, isAdmin: true, requestingUserId: 1);
+        $result = $useCase->execute(targetUserId: 'user-7', isAdmin: true, requestingUserId: 'user-1');
 
         $this->assertArrayHasKey('id', $result);
         $this->assertArrayHasKey('email', $result);

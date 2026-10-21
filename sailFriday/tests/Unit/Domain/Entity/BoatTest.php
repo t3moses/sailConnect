@@ -93,9 +93,6 @@ class BoatTest extends TestCase
         $boat = $this->createBoat();
 
         $boat->setDisplayName('New Name');
-        $boat->setOwnerFirstName('Jane');
-        $boat->setOwnerLastName('Smith');
-        $boat->setOwnerMobile('555-5678');
         $boat->setMinBerths(2);
         $boat->setMaxBerths(4);
         $boat->setAssistanceRequired(true);
@@ -103,9 +100,6 @@ class BoatTest extends TestCase
 
         // Assert
         $this->assertEquals('New Name', $boat->getDisplayName());
-        $this->assertEquals('Jane', $boat->getOwnerFirstName());
-        $this->assertEquals('Smith', $boat->getOwnerLastName());
-        $this->assertEquals('555-5678', $boat->getOwnerMobile());
         $this->assertEquals(2, $boat->getMinBerths());
         $this->assertEquals(4, $boat->getMaxBerths());
         $this->assertTrue($boat->requiresAssistance());

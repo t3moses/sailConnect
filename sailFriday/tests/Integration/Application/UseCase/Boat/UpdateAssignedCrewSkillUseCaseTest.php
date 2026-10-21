@@ -57,51 +57,49 @@ class UpdateAssignedCrewSkillUseCaseTest extends IntegrationTestCase
 
     // ==================== HELPER METHODS ====================
 
-    protected function createBoatProfileForUser(int $userId, array $overrides = []): string
+    protected function createBoatProfileForUser(string $userId, array $overrides = []): string
     {
         $key = $overrides['key'] ?? 'boat_' . $userId;
 
         $stmt = $this->pdo->prepare('
             INSERT INTO boats (
-                key, display_name, owner_first_name, owner_last_name,
+                key, display_name,
                 min_berths, max_berths, assistance_required, social_preference,
                 owner_user_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ');
         $stmt->execute([
             $key,
             $overrides['displayName'] ?? 'Test Boat',
-            'Test',
-            'Owner',
             $overrides['minBerths'] ?? 1,
             $overrides['maxBerths'] ?? 4,
             'No',
             'No',
-            $userId,
+            $userId
         ]);
+        $this->linkIdentity('boats', (int)$this->pdo->lastInsertId(), ['first_name' => 'Test', 'last_name' => 'Owner']);
 
         return $key;
     }
 
-    protected function createCrewProfileForUser(int $userId, array $overrides = []): string
+    protected function createCrewProfileForUser(string $userId, array $overrides = []): string
     {
         $key = $overrides['key'] ?? 'crew_' . $userId;
 
         $stmt = $this->pdo->prepare('
             INSERT INTO crews (
-                key, display_name, first_name, last_name, skill,
+                key, display_name, skill,
                 commitment_rank, user_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ');
         $stmt->execute([
             $key,
             $overrides['displayName'] ?? 'Test Crew',
-            'Test',
-            'Crew',
             $overrides['skill'] ?? 0,
             2,
-            $userId,
+            $userId
         ]);
+        $this->linkIdentity('crews', (int)$this->pdo->lastInsertId(), ['first_name' => 'Test', 'last_name' => 'Crew']);
 
         return $key;
     }
@@ -226,7 +224,7 @@ class UpdateAssignedCrewSkillUseCaseTest extends IntegrationTestCase
 
     public function testBoatNotFoundThrowsException(): void
     {
-        $nonExistentUserId = 99999;
+        $nonExistentUserId = 'user-99999';
 
         $this->expectException(BoatNotFoundException::class);
 

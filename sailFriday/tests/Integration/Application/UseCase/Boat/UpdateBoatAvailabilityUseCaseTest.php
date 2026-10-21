@@ -90,37 +90,35 @@ class UpdateBoatAvailabilityUseCaseTest extends IntegrationTestCase
         string $email = 'test@example.com',
         string $accountType = 'boat_owner',  // Override default to boat_owner for boat tests
         bool $isAdmin = false
-    ): int {
+    ): string {
         return parent::createTestUser($email, $accountType, $isAdmin);
     }
 
     /**
      * Create boat profile for user
      */
-    protected function createBoatProfileForUser(int $userId, array $overrides = []): string
+    protected function createBoatProfileForUser(string $userId, array $overrides = []): string
     {
         $key = $overrides['key'] ?? 'boat_' . $userId;
 
         $stmt = $this->pdo->prepare('
             INSERT INTO boats (
-                key, display_name, owner_first_name, owner_last_name, owner_mobile,
+                key, display_name,
                 min_berths, max_berths, assistance_required, social_preference,
                 owner_user_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ');
 
         $stmt->execute([
             $key,
             $overrides['displayName'] ?? 'Test Boat',
-            $overrides['ownerFirstName'] ?? 'Test',
-            $overrides['ownerLastName'] ?? 'Owner',
-            $overrides['ownerMobile'] ?? '555-5678',
             $overrides['minBerths'] ?? 2,
             $overrides['maxBerths'] ?? 3,
             $overrides['assistanceRequired'] ?? 'No',
             $overrides['socialPreference'] ?? 'No',
             $userId
         ]);
+        $this->linkIdentity('boats', (int)$this->pdo->lastInsertId(), ['first_name' => $overrides['ownerFirstName'] ?? 'Test', 'last_name' => $overrides['ownerLastName'] ?? 'Owner', 'mobile_number' => $overrides['ownerMobile'] ?? '555-5678']);
 
         return $key;
     }
@@ -444,7 +442,7 @@ class UpdateBoatAvailabilityUseCaseTest extends IntegrationTestCase
     public function testBoatNotFoundThrowsException(): void
     {
         // Arrange
-        $nonExistentUserId = 99999;
+        $nonExistentUserId = 'user-99999';
 
         $request = new UpdateAvailabilityRequest([
             ['eventId' => 'Fri May 15', 'isAvailable' => true]
@@ -452,7 +450,7 @@ class UpdateBoatAvailabilityUseCaseTest extends IntegrationTestCase
 
         // Assert
         $this->expectException(BoatNotFoundException::class);
-        $this->expectExceptionMessage('Boat not found for user ID: 99999');
+        $this->expectExceptionMessage('Boat not found for user ID: user-99999');
 
         // Act
         $this->useCase->execute($nonExistentUserId, $request);

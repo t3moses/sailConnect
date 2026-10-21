@@ -86,19 +86,28 @@ class RegisterUseCaseTest extends IntegrationTestCase
         );
     }
 
-    /** The sailConnect identity the signed-in user would have; names and membership mirror the profile. */
+    /**
+     * The sailConnect identity the signed-in user would have (a real row in the attached auth database).
+     * Names, mobile number and membership mirror the profile the test submitted.
+     */
     private function identity(string $email, RegisterRequest $request): array
     {
         $p = $request->profile ?? [];
+        $member = !empty($p['membershipNumber']);
 
-        return [
-            'user_id' => 'auth-' . md5($email),
+        $userId = $this->createIdentity([
             'email_address' => $email,
             'first_name' => $p['firstName'] ?? $p['ownerFirstName'] ?? 'Test',
             'last_name' => $p['lastName'] ?? $p['ownerLastName'] ?? 'User',
-            'is_member' => !empty($p['membershipNumber']),
-            'membership_number' => $p['membershipNumber'] ?? null,
-        ];
+            'is_member' => $member ? 1 : 0,
+            'membership_number' => $member ? $p['membershipNumber'] : null,
+            'mobile_number' => $p['mobile'] ?? $p['ownerMobile'] ?? '613-555-0100',
+        ]);
+
+        $row = $this->pdo->prepare('SELECT * FROM auth.users WHERE user_id = ?');
+        $row->execute([$userId]);
+
+        return $row->fetch(\PDO::FETCH_ASSOC);
     }
 
     public function testRegisterCrewWithValidDataReturnsUser(): void
@@ -199,7 +208,7 @@ class RegisterUseCaseTest extends IntegrationTestCase
         // Create first user
         $user = new User(
             email: 'duplicate@example.com',
-            passwordHash: '',
+            id: $this->createIdentity(['email_address' => 'duplicate@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -625,9 +634,39 @@ class RegisterUseCaseTest extends IntegrationTestCase
 
         $this->useCase->execute($request, $identity);
 
-        $user = $this->userRepository->findByAuthUserId($identity['user_id']);
+        $user = $this->userRepository->findById($identity['user_id']);
         $this->assertNotNull($user);
         $this->assertSame('linked@example.com', $user->getEmail());
-        $this->assertSame('', $user->getPasswordHash(), 'Credentials live in sailConnect, not here');
+
+        // Name and mobile are read from sailConnect, not stored by Sail Friday
+        $crew = $this->crewRepository->findByUserId($user->getId());
+        $this->assertSame('Link', $crew->getFirstName());
+        $this->assertSame('Test', $crew->getLastName());
+        $this->assertSame($identity['mobile_number'], $crew->getMobile());
+        $this->assertSame(0, (int)$this->pdo->query(
+            "SELECT COUNT(*) FROM pragma_table_info('crews') WHERE name IN ('first_name', 'last_name', 'mobile')"
+        )->fetchColumn());
+    }
+
+    public function testSailConnectProfileChangesShowUpWithoutAnySync(): void
+    {
+        $request = RegisterRequest::fromArray([
+            'accountType' => 'crew',
+            'profile' => ['firstName' => 'Sam', 'lastName' => 'Sailor'],
+        ]);
+        $identity = $this->identity('sam@example.com', $request);
+        $this->useCase->execute($request, $identity);
+        $user = $this->userRepository->findById($identity['user_id']);
+
+        $this->pdo->prepare(
+            "UPDATE auth.users SET email_address = 'sam.new@example.com', mobile_number = '613-555-0199',
+                    is_member = 1, membership_number = '7060-13489' WHERE user_id = ?"
+        )->execute([$identity['user_id']]);
+
+        $this->assertSame('sam.new@example.com', $this->userRepository->findById($user->getId())->getEmail());
+        $crew = $this->crewRepository->findByUserId($user->getId());
+        $this->assertSame('613-555-0199', $crew->getMobile());
+        $this->assertSame('7060-13489', $crew->getMembershipNumber());
+        $this->assertSame(1, $crew->getRank()->getDimension(\App\Domain\Enum\CrewRankDimension::MEMBERSHIP));
     }
 }

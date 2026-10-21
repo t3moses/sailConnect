@@ -34,6 +34,25 @@ class BoatRepositoryTest extends IntegrationTestCase
         $this->userRepository = new UserRepository();
     }
 
+    /**
+     * Save a boat whose owner's name and mobile come from a sailConnect identity,
+     * created (or updated, when the boat already has an owner user) from the entity's own values
+     */
+    private function saveWithIdentity(Boat $boat): void
+    {
+        $identity = [
+            'first_name' => $boat->getOwnerFirstName(),
+            'last_name' => $boat->getOwnerLastName(),
+            'mobile_number' => $boat->getOwnerMobile(),
+        ];
+        if ($boat->getOwnerUserId() === null) {
+            $boat->setOwnerUserId($this->createLinkedUser($identity, 'boat_owner'));
+        } else {
+            $this->updateIdentity($boat->getOwnerUserId(), $identity);
+        }
+        $this->repository->save($boat);
+    }
+
     public function testSaveInsertsNewBoat(): void
     {
         $boat = new Boat(
@@ -47,7 +66,7 @@ class BoatRepositoryTest extends IntegrationTestCase
             assistanceRequired: false,
             socialPreference: false
         );
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
 
         $this->assertNotNull($boat->getId());
         $this->assertGreaterThan(0, $boat->getId());
@@ -57,7 +76,7 @@ class BoatRepositoryTest extends IntegrationTestCase
     {
         $key = BoatKey::fromBoatName('WindSeeker');
         $boat = $this->createTestBoat('Jane', 'Doe', 'WindSeeker');
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
 
         $foundBoat = $this->repository->findByKey($key);
 
@@ -79,7 +98,7 @@ class BoatRepositoryTest extends IntegrationTestCase
     public function testFindByOwnerNameReturnsBoatWhenExists(): void
     {
         $boat = $this->createTestBoat('Alice', 'Wonder', 'Dream Catcher');
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
 
         $foundBoat = $this->repository->findByOwnerName('Alice', 'Wonder');
 
@@ -99,7 +118,7 @@ class BoatRepositoryTest extends IntegrationTestCase
         // Create user
         $user = new User(
             email: 'boatowner@example.com',
-            passwordHash: 'hash',
+            id: $this->createIdentity(['email_address' => 'boatowner@example.com']),
             accountType: 'boat_owner',
             isAdmin: false
         );
@@ -109,7 +128,7 @@ class BoatRepositoryTest extends IntegrationTestCase
         // Create boat with user ID
         $boat = $this->createTestBoat('Bob', 'Builder', 'Can We Fix It');
         $boat->setOwnerUserId($userId);
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
 
         $foundBoat = $this->repository->findByOwnerUserId($userId);
 
@@ -120,7 +139,7 @@ class BoatRepositoryTest extends IntegrationTestCase
 
     public function testFindByOwnerUserIdReturnsNullWhenNotExists(): void
     {
-        $result = $this->repository->findByOwnerUserId(99999);
+        $result = $this->repository->findByOwnerUserId('user-99999');
 
         $this->assertNull($result);
     }
@@ -180,12 +199,12 @@ class BoatRepositoryTest extends IntegrationTestCase
     public function testSaveUpdatesExistingBoat(): void
     {
         $boat = $this->createTestBoat('Charlie', 'Brown', 'Original Name');
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
         $boatId = $boat->getId();
 
         // Update display name
         $boat->setDisplayName('Updated Name');
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
 
         $updatedBoat = $this->repository->findByKey($boat->getKey());
         $this->assertNotNull($updatedBoat);
@@ -196,7 +215,7 @@ class BoatRepositoryTest extends IntegrationTestCase
     public function testDeleteRemovesBoat(): void
     {
         $boat = $this->createTestBoat('Delete', 'Me', 'ToBeDeleted');
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
         $key = $boat->getKey();
 
         $this->assertTrue($this->repository->exists($key));
@@ -219,7 +238,7 @@ class BoatRepositoryTest extends IntegrationTestCase
     public function testExistsReturnsTrueForExistingBoat(): void
     {
         $boat = $this->createTestBoat('Exists', 'Test', 'ExistingBoat');
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
 
         $this->assertTrue($this->repository->exists($boat->getKey()));
     }
@@ -325,7 +344,7 @@ class BoatRepositoryTest extends IntegrationTestCase
             assistanceRequired: true,
             socialPreference: false
         );
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
 
         $foundBoat = $this->repository->findByKey($boat->getKey());
 
@@ -340,10 +359,9 @@ class BoatRepositoryTest extends IntegrationTestCase
 
     public function testOwnerMobileIsPersisted(): void
     {
-        $boat = $this->createTestBoat('Mobile', 'Test', 'MobileBoat');
-        $boat->setOwnerMobile('555-1234');
+        $boat = $this->createTestBoat('Mobile', 'Test', 'MobileBoat', '555-1234');
 
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
 
         $foundBoat = $this->repository->findByKey($boat->getKey());
         $this->assertEquals('555-1234', $foundBoat->getOwnerMobile());
@@ -353,19 +371,19 @@ class BoatRepositoryTest extends IntegrationTestCase
     {
         $boat = $this->createTestBoat('Assist', 'Test', 'AssistBoat');
         $boat->setAssistanceRequired(false);
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
         $boatId = $boat->getId();
 
         // Toggle to true
         $boat->setAssistanceRequired(true);
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
 
         $foundBoat = $this->repository->findByKey($boat->getKey());
         $this->assertTrue($foundBoat->requiresAssistance());
 
         // Toggle back to false
         $boat->setAssistanceRequired(false);
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
 
         $foundBoat = $this->repository->findByKey($boat->getKey());
         $this->assertFalse($foundBoat->requiresAssistance());
@@ -389,14 +407,14 @@ class BoatRepositoryTest extends IntegrationTestCase
     }
 
     // Helper methods
-    private function createTestBoat(string $firstName, string $lastName, string $displayName): Boat
+    private function createTestBoat(string $firstName, string $lastName, string $displayName, string $mobile = '555-0000'): Boat
     {
         $boat = new Boat(
             key: BoatKey::fromBoatName($displayName),
             displayName: $displayName,
             ownerFirstName: $firstName,
             ownerLastName: $lastName,
-            ownerMobile: '555-0000',
+            ownerMobile: $mobile,
             minBerths: 2,
             maxBerths: 6,
             assistanceRequired: false,
@@ -408,7 +426,7 @@ class BoatRepositoryTest extends IntegrationTestCase
     private function createAndSaveBoat(string $firstName, string $lastName, string $displayName): Boat
     {
         $boat = $this->createTestBoat($firstName, $lastName, $displayName);
-        $this->repository->save($boat);
+        $this->saveWithIdentity($boat);
         return $boat;
     }
 }

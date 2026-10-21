@@ -31,7 +31,7 @@ class UserRepositoryTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'newuser@example.com',
-            passwordHash: 'hashed_password',
+            id: $this->createIdentity(['email_address' => 'newuser@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -48,7 +48,7 @@ class UserRepositoryTest extends IntegrationTestCase
         // Create user
         $user = new User(
             email: 'findbyid@example.com',
-            passwordHash: 'hashed_password',
+            id: $this->createIdentity(['email_address' => 'findbyid@example.com']),
             accountType: 'boat_owner',
             isAdmin: true
         );
@@ -67,7 +67,7 @@ class UserRepositoryTest extends IntegrationTestCase
 
     public function testFindByIdReturnsNullWhenNotExists(): void
     {
-        $result = $this->repository->findById(99999);
+        $result = $this->repository->findById('user-99999');
 
         $this->assertNull($result);
     }
@@ -77,7 +77,7 @@ class UserRepositoryTest extends IntegrationTestCase
         // Create user
         $user = new User(
             email: 'findbyemail@example.com',
-            passwordHash: 'hashed_password',
+            id: $this->createIdentity(['email_address' => 'findbyemail@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -103,7 +103,7 @@ class UserRepositoryTest extends IntegrationTestCase
         // Create user
         $user = new User(
             email: 'exists@example.com',
-            passwordHash: 'hashed_password',
+            id: $this->createIdentity(['email_address' => 'exists@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -120,24 +120,18 @@ class UserRepositoryTest extends IntegrationTestCase
 
     public function testSaveUpdatesExistingUser(): void
     {
-        // Create user
-        $user = new User(
-            email: 'update@example.com',
-            passwordHash: 'original_hash',
-            accountType: 'crew',
-            isAdmin: false
-        );
+        $user = $this->newUser('update@example.com');
         $this->repository->save($user);
         $userId = $user->getId();
 
-        // Update email
-        $user->setEmail('newemail@example.com');
+        $user->setAccountType('boat_owner');
+        $user->setIsAdmin(true);
         $this->repository->save($user);
 
-        // Verify update
         $updatedUser = $this->repository->findById($userId);
         $this->assertNotNull($updatedUser);
-        $this->assertEquals('newemail@example.com', $updatedUser->getEmail());
+        $this->assertEquals('boat_owner', $updatedUser->getAccountType());
+        $this->assertTrue($updatedUser->isAdmin());
         $this->assertEquals($userId, $updatedUser->getId()); // ID should remain same
     }
 
@@ -146,7 +140,7 @@ class UserRepositoryTest extends IntegrationTestCase
         // Create user
         $user = new User(
             email: 'delete@example.com',
-            passwordHash: 'hashed_password',
+            id: $this->createIdentity(['email_address' => 'delete@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -167,7 +161,7 @@ class UserRepositoryTest extends IntegrationTestCase
     public function testDeleteNonExistentUserDoesNotThrowError(): void
     {
         // Should not throw exception
-        $this->repository->delete(99999);
+        $this->repository->delete('user-99999');
 
         // Test passes if no exception thrown
         $this->assertTrue(true);
@@ -181,7 +175,7 @@ class UserRepositoryTest extends IntegrationTestCase
         for ($i = 1; $i <= 3; $i++) {
             $user = new User(
                 email: "user{$i}@example.com",
-                passwordHash: 'hashed_password',
+                id: $this->createIdentity(['email_address' => "user{$i}@example.com"]),
                 accountType: 'crew',
                 isAdmin: false
             );
@@ -191,22 +185,13 @@ class UserRepositoryTest extends IntegrationTestCase
         $this->assertEquals($initialCount + 3, $this->repository->count());
     }
 
-    public function testPasswordHashIsPersisted(): void
+    public function testNoCredentialsAreStored(): void
     {
-        $passwordHash = password_hash('SecurePassword123', PASSWORD_BCRYPT);
+        $this->repository->save($this->newUser('password@example.com'));
 
-        $user = new User(
-            email: 'password@example.com',
-            passwordHash: $passwordHash,
-            accountType: 'crew',
-            isAdmin: false
-        );
-        $this->repository->save($user);
-
-        // Retrieve and verify password hash
-        $foundUser = $this->repository->findByEmail('password@example.com');
-        $this->assertNotNull($foundUser);
-        $this->assertEquals($passwordHash, $foundUser->getPasswordHash());
+        $columns = array_column($this->pdo->query('PRAGMA main.table_info(users)')->fetchAll(\PDO::FETCH_ASSOC), 'name');
+        $this->assertNotContains('password_hash', $columns);
+        $this->assertNotContains('email', $columns);
     }
 
     public function testAccountTypeIsPersisted(): void
@@ -214,7 +199,7 @@ class UserRepositoryTest extends IntegrationTestCase
         // Test crew account
         $crewUser = new User(
             email: 'crew@example.com',
-            passwordHash: 'hash',
+            id: $this->createIdentity(['email_address' => 'crew@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -223,7 +208,7 @@ class UserRepositoryTest extends IntegrationTestCase
         // Test boat_owner account
         $boatUser = new User(
             email: 'boat@example.com',
-            passwordHash: 'hash',
+            id: $this->createIdentity(['email_address' => 'boat@example.com']),
             accountType: 'boat_owner',
             isAdmin: false
         );
@@ -242,7 +227,7 @@ class UserRepositoryTest extends IntegrationTestCase
         // Create admin user
         $adminUser = new User(
             email: 'admin@example.com',
-            passwordHash: 'hash',
+            id: $this->createIdentity(['email_address' => 'admin@example.com']),
             accountType: 'crew',
             isAdmin: true
         );
@@ -251,7 +236,7 @@ class UserRepositoryTest extends IntegrationTestCase
         // Create regular user
         $regularUser = new User(
             email: 'regular@example.com',
-            passwordHash: 'hash',
+            id: $this->createIdentity(['email_address' => 'regular@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -265,104 +250,36 @@ class UserRepositoryTest extends IntegrationTestCase
         $this->assertFalse($foundRegular->isAdmin());
     }
 
-    public function testLastLoginIsPersisted(): void
+    public function testEmailFollowsTheSailConnectIdentity(): void
     {
-        $user = new User(
-            email: 'login@example.com',
-            passwordHash: 'hash',
-            accountType: 'crew',
-            isAdmin: false
-        );
-
-        // Update last login
-        $loginTime = new \DateTimeImmutable('2026-02-08 10:30:00');
-        $user->updateLastLogin($loginTime);
-
+        $user = $this->newUser('original@example.com');
         $this->repository->save($user);
         $userId = $user->getId();
 
-        // Retrieve and verify
-        $foundUser = $this->repository->findById($userId);
-        $this->assertNotNull($foundUser);
-        $this->assertNotNull($foundUser->getLastLogin());
-        $this->assertEquals('2026-02-08', $foundUser->getLastLogin()->format('Y-m-d'));
-    }
-
-    public function testLastLogoutIsPersisted(): void
-    {
-        $user = new User(
-            email: 'logout@example.com',
-            passwordHash: 'hash',
-            accountType: 'crew',
-            isAdmin: false
-        );
-
-        // Update last logout
-        $logoutTime = new \DateTimeImmutable('2026-02-08 15:45:00');
-        $user->updateLastLogout($logoutTime);
-
-        $this->repository->save($user);
-        $userId = $user->getId();
-
-        // Retrieve and verify
-        $foundUser = $this->repository->findById($userId);
-        $this->assertNotNull($foundUser);
-        $this->assertNotNull($foundUser->getLastLogout());
-        $this->assertEquals('2026-02-08', $foundUser->getLastLogout()->format('Y-m-d'));
-    }
-
-    public function testUpdateEmailChangesEmail(): void
-    {
-        $user = new User(
-            email: 'original@example.com',
-            passwordHash: 'hash',
-            accountType: 'crew',
-            isAdmin: false
-        );
-        $this->repository->save($user);
-        $userId = $user->getId();
-
-        // Update email
-        $user->setEmail('updated@example.com');
-        $this->repository->save($user);
+        // The email is changed in sailConnect, not in Sail Friday
+        $this->updateAuthEmail($userId, 'updated@example.com');
 
         // Verify old email doesn't exist
         $this->assertNull($this->repository->findByEmail('original@example.com'));
+        $this->assertFalse($this->repository->emailExists('original@example.com'));
 
         // Verify new email exists
         $foundUser = $this->repository->findByEmail('updated@example.com');
         $this->assertNotNull($foundUser);
         $this->assertEquals($userId, $foundUser->getId());
+        $this->assertEquals('updated@example.com', $this->repository->findById($userId)->getEmail());
     }
 
-    public function testUpdatePasswordChangesPasswordHash(): void
+    private function updateAuthEmail(string $userId, string $email): void
     {
-        $user = new User(
-            email: 'password_update@example.com',
-            passwordHash: 'old_hash',
-            accountType: 'crew',
-            isAdmin: false
-        );
-        $this->repository->save($user);
-        $userId = $user->getId();
-
-        // Update password
-        $newHash = password_hash('NewPassword456', PASSWORD_BCRYPT);
-        $user->setPasswordHash($newHash);
-        $this->repository->save($user);
-
-        // Verify new hash
-        $foundUser = $this->repository->findById($userId);
-        $this->assertNotNull($foundUser);
-        $this->assertEquals($newHash, $foundUser->getPasswordHash());
-        $this->assertNotEquals('old_hash', $foundUser->getPasswordHash());
+        $this->pdo->prepare('UPDATE auth.users SET email_address = ? WHERE user_id = ?')->execute([$email, $userId]);
     }
 
     public function testTimestampsAreAutomaticallySet(): void
     {
         $user = new User(
             email: 'timestamps@example.com',
-            passwordHash: 'hash',
+            id: $this->createIdentity(['email_address' => 'timestamps@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -379,7 +296,7 @@ class UserRepositoryTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'update_timestamp@example.com',
-            passwordHash: 'hash',
+            id: $this->createIdentity(['email_address' => 'update_timestamp@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -392,7 +309,7 @@ class UserRepositoryTest extends IntegrationTestCase
         sleep(1);
 
         // Update the user
-        $user->setEmail('new_update_timestamp@example.com');
+        $user->setIsAdmin(true);
         $this->repository->save($user);
 
         $updatedUser = $this->repository->findById($userId);
@@ -408,7 +325,7 @@ class UserRepositoryTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'created_timestamp@example.com',
-            passwordHash: 'hash',
+            id: $this->createIdentity(['email_address' => 'created_timestamp@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -418,7 +335,7 @@ class UserRepositoryTest extends IntegrationTestCase
         $originalCreatedAt = $user->getCreatedAt();
 
         // Update the user
-        $user->setEmail('new_created_timestamp@example.com');
+        $user->setIsAdmin(true);
         $this->repository->save($user);
 
         $updatedUser = $this->repository->findById($userId);
@@ -444,9 +361,9 @@ class UserRepositoryTest extends IntegrationTestCase
 
     public function testFindAllReturnsAllUsers(): void
     {
-        $this->repository->save(new User(email: 'alpha@example.com', passwordHash: 'hash', accountType: 'crew'));
-        $this->repository->save(new User(email: 'beta@example.com',  passwordHash: 'hash', accountType: 'crew'));
-        $this->repository->save(new User(email: 'gamma@example.com', passwordHash: 'hash', accountType: 'crew'));
+        $this->repository->save(new User(email: 'alpha@example.com', id: $this->createIdentity(['email_address' => 'alpha@example.com']), accountType: 'crew'));
+        $this->repository->save(new User(email: 'beta@example.com', id: $this->createIdentity(['email_address' => 'beta@example.com']),  accountType: 'crew'));
+        $this->repository->save(new User(email: 'gamma@example.com', id: $this->createIdentity(['email_address' => 'gamma@example.com']), accountType: 'crew'));
 
         $result = $this->repository->findAll();
 
@@ -455,9 +372,9 @@ class UserRepositoryTest extends IntegrationTestCase
 
     public function testFindAllReturnsUsersOrderedByEmail(): void
     {
-        $this->repository->save(new User(email: 'charlie@example.com', passwordHash: 'hash', accountType: 'crew'));
-        $this->repository->save(new User(email: 'alice@example.com',   passwordHash: 'hash', accountType: 'crew'));
-        $this->repository->save(new User(email: 'bob@example.com',     passwordHash: 'hash', accountType: 'crew'));
+        $this->repository->save(new User(email: 'charlie@example.com', id: $this->createIdentity(['email_address' => 'charlie@example.com']), accountType: 'crew'));
+        $this->repository->save(new User(email: 'alice@example.com', id: $this->createIdentity(['email_address' => 'alice@example.com']),   accountType: 'crew'));
+        $this->repository->save(new User(email: 'bob@example.com', id: $this->createIdentity(['email_address' => 'bob@example.com']),     accountType: 'crew'));
 
         $result = $this->repository->findAll();
 
@@ -470,10 +387,9 @@ class UserRepositoryTest extends IntegrationTestCase
     {
         $this->repository->save(new User(
             email: 'hydrate@example.com',
-            passwordHash: 'hashed_pw',
+            id: $this->createIdentity(['email_address' => 'hydrate@example.com']),
             accountType: 'boat_owner',
-            isAdmin: true,
-        ));
+            isAdmin: true));
 
         $result = $this->repository->findAll();
 

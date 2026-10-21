@@ -33,7 +33,7 @@ class GetSessionUseCaseTest extends IntegrationTestCase
         // Create and save a user
         $user = new User(
             email: 'session@example.com',
-            passwordHash: password_hash('password123', PASSWORD_BCRYPT),
+            id: $this->createIdentity(['email_address' => 'session@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -54,7 +54,7 @@ class GetSessionUseCaseTest extends IntegrationTestCase
         // Create boat owner user
         $user = new User(
             email: 'boatowner@example.com',
-            passwordHash: password_hash('password123', PASSWORD_BCRYPT),
+            id: $this->createIdentity(['email_address' => 'boatowner@example.com']),
             accountType: 'boat_owner',
             isAdmin: false
         );
@@ -73,7 +73,7 @@ class GetSessionUseCaseTest extends IntegrationTestCase
         // Create admin user
         $user = new User(
             email: 'admin@example.com',
-            passwordHash: password_hash('password123', PASSWORD_BCRYPT),
+            id: $this->createIdentity(['email_address' => 'admin@example.com']),
             accountType: 'crew',
             isAdmin: true
         );
@@ -91,7 +91,7 @@ class GetSessionUseCaseTest extends IntegrationTestCase
     {
         $this->expectException(\RuntimeException::class);
 
-        $this->useCase->execute(99999);
+        $this->useCase->execute('user-99999');
     }
 
     public function testGetSessionPreservesUserData(): void
@@ -99,11 +99,10 @@ class GetSessionUseCaseTest extends IntegrationTestCase
         // Create user with specific data
         $user = new User(
             email: 'preservation@example.com',
-            passwordHash: password_hash('password123', PASSWORD_BCRYPT),
+            id: $this->createIdentity(['email_address' => 'preservation@example.com']),
             accountType: 'boat_owner',
             isAdmin: true
         );
-        $user->updateLastLogin(new \DateTimeImmutable('2026-02-01 15:30:00'));
         $this->userRepository->save($user);
         $userId = $user->getId();
 
@@ -121,7 +120,7 @@ class GetSessionUseCaseTest extends IntegrationTestCase
         // Create multiple users
         $user1 = new User(
             email: 'user1@example.com',
-            passwordHash: password_hash('password123', PASSWORD_BCRYPT),
+            id: $this->createIdentity(['email_address' => 'user1@example.com']),
             accountType: 'crew',
             isAdmin: false
         );
@@ -129,7 +128,7 @@ class GetSessionUseCaseTest extends IntegrationTestCase
 
         $user2 = new User(
             email: 'user2@example.com',
-            passwordHash: password_hash('password123', PASSWORD_BCRYPT),
+            id: $this->createIdentity(['email_address' => 'user2@example.com']),
             accountType: 'boat_owner',
             isAdmin: true
         );
@@ -154,7 +153,7 @@ class GetSessionUseCaseTest extends IntegrationTestCase
         // Create and save user
         $user = new User(
             email: 'deleme@example.com',
-            passwordHash: password_hash('password123', PASSWORD_BCRYPT),
+            id: $this->createIdentity(['email_address' => 'deleme@example.com']),
             accountType: 'crew',
             isAdmin: false
         );

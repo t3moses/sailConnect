@@ -31,10 +31,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'john.doe@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'john.doe@example.com']),
             accountType: 'crew'
         );
-        $user->setId(123);
 
         $profile = [
             'firstName' => 'John',
@@ -67,7 +66,7 @@ class EmailTemplateServiceTest extends IntegrationTestCase
         $this->assertStringContainsString('NSC-001', $html);
         $this->assertStringContainsString('Yes', $html); // social preference
         $this->assertStringContainsString('5 years sailing experience', $html);
-        $this->assertStringContainsString('123', $html); // user ID
+        $this->assertStringContainsString($user->getId(), $html); // user ID
 
         // Verify footer
         $this->assertStringContainsString('automated notification from the Sail Friday sailing management system', $html);
@@ -81,10 +80,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'jane@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'jane@example.com']),
             accountType: 'crew'
         );
-        $user->setId(456);
 
         $profile = [
             'firstName' => 'Jane',
@@ -109,10 +107,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'test@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'test@example.com']),
             accountType: 'crew'
         );
-        $user->setId(789);
 
         $profile = [
             'firstName' => 'Robert',
@@ -130,10 +127,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'test@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'test@example.com']),
             accountType: 'crew'
         );
-        $user->setId(1);
 
         // Test Novice (0)
         $profile = ['firstName' => 'Test', 'lastName' => 'User', 'skill' => 0];
@@ -160,10 +156,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'test@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'test@example.com']),
             accountType: 'crew'
         );
-        $user->setId(1);
 
         $baseProfile = ['firstName' => 'Test', 'lastName' => 'User'];
 
@@ -211,10 +206,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'owner@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'owner@example.com']),
             accountType: 'boat_owner'
         );
-        $user->setId(999);
 
         $profile = [
             'displayName' => 'The Black Pearl',
@@ -246,10 +240,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'boat@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'boat@example.com']),
             accountType: 'boat_owner'
         );
-        $user->setId(888);
 
         $profile = [
             'ownerFirstName' => 'Boat',
@@ -275,10 +268,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'test@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'test@example.com']),
             accountType: 'boat_owner'
         );
-        $user->setId(777);
 
         $profile = [
             'ownerFirstName' => 'Test',
@@ -302,10 +294,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'test@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'test@example.com']),
             accountType: 'crew'
         );
-        $user->setId(1);
 
         $profile = [
             'firstName' => 'John<script>alert("XSS")</script>',
@@ -328,10 +319,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'test@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'test@example.com']),
             accountType: 'crew'
         );
-        $user->setId(1);
 
         $profile = [
             'firstName' => 'François',
@@ -348,10 +338,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'test@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'test@example.com']),
             accountType: 'crew'
         );
-        $user->setId(1);
 
         $baseProfile = ['firstName' => 'Test', 'lastName' => 'User'];
 
@@ -385,10 +374,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'test@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'test@example.com']),
             accountType: 'crew'
         );
-        $user->setId(1);
 
         $crewProfile = ['firstName' => 'Test', 'lastName' => 'User'];
         $crewHtml = $this->service->renderCrewRegistrationNotification($user, $crewProfile);
@@ -475,10 +463,9 @@ class EmailTemplateServiceTest extends IntegrationTestCase
     {
         $user = new User(
             email: 'test@example.com',
-            passwordHash: password_hash('password', PASSWORD_DEFAULT),
+            id: $this->createIdentity(['email_address' => 'test@example.com']),
             accountType: 'crew'
         );
-        $user->setId(1);
 
         $crewProfile = ['firstName' => 'Test', 'lastName' => 'User'];
         $html = $this->service->renderCrewRegistrationNotification($user, $crewProfile);

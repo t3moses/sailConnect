@@ -54,7 +54,7 @@ class SendBoatOwnerReminderUseCaseTest extends TestCase
         ];
     }
 
-    private function makeBoat(string $key = 'sailaway', ?int $ownerUserId = 1): Boat
+    private function makeBoat(string $key = 'sailaway', ?string $ownerUserId = 'user-1'): Boat
     {
         $boat = new Boat(
             key: BoatKey::fromString($key),
@@ -71,11 +71,10 @@ class SendBoatOwnerReminderUseCaseTest extends TestCase
         return $boat;
     }
 
-    private function makeUser(int $id = 1, string $email = 'sam@example.com'): User
+    private function makeUser(string $id = 'user-1', string $email = 'sam@example.com'): User
     {
         $user = new User(
             email: $email,
-            passwordHash: 'hash',
             accountType: 'boat_owner',
             isAdmin: false
         );
@@ -130,11 +129,11 @@ class SendBoatOwnerReminderUseCaseTest extends TestCase
 
     public function testSkipsBoatWhenOwnerUserNotFound(): void
     {
-        $boat = $this->makeBoat('sailaway', 99);
+        $boat = $this->makeBoat('sailaway', 'user-99');
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->boatRepository->method('findAvailableForEvent')->willReturn([$boat]);
-        $this->userRepository->method('findById')->with(99)->willReturn(null);
+        $this->userRepository->method('findById')->with('user-99')->willReturn(null);
 
         $this->emailService->expects($this->never())->method('send');
 
@@ -147,14 +146,14 @@ class SendBoatOwnerReminderUseCaseTest extends TestCase
 
     public function testSendsEmailToEachRegisteredBoatOwner(): void
     {
-        $boat1 = $this->makeBoat('sailaway', 1);
-        $boat2 = $this->makeBoat('windchaser', 2);
-        $user1 = $this->makeUser(1, 'sam@example.com');
-        $user2 = $this->makeUser(2, 'pat@example.com');
+        $boat1 = $this->makeBoat('sailaway', 'user-1');
+        $boat2 = $this->makeBoat('windchaser', 'user-2');
+        $user1 = $this->makeUser('user-1', 'sam@example.com');
+        $user2 = $this->makeUser('user-2', 'pat@example.com');
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->boatRepository->method('findAvailableForEvent')->willReturn([$boat1, $boat2]);
-        $this->userRepository->method('findById')->willReturnMap([[1, $user1], [2, $user2]]);
+        $this->userRepository->method('findById')->willReturnMap([['user-1', $user1], ['user-2', $user2]]);
         $this->emailTemplateService->method('renderBoatOwnerReminderNotification')
             ->willReturn('<html>reminder</html>');
 
@@ -170,8 +169,8 @@ class SendBoatOwnerReminderUseCaseTest extends TestCase
 
     public function testCountsFailedSendsAsSkipped(): void
     {
-        $boat = $this->makeBoat('sailaway', 1);
-        $user = $this->makeUser(1, 'sam@example.com');
+        $boat = $this->makeBoat('sailaway', 'user-1');
+        $user = $this->makeUser('user-1', 'sam@example.com');
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->boatRepository->method('findAvailableForEvent')->willReturn([$boat]);

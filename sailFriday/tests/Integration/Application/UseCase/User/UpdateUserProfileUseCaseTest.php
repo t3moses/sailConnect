@@ -23,8 +23,8 @@ use Psr\Log\NullLogger;
  *
  * Tests the complete profile update workflow including:
  * - Rejection of email/password changes (owned by sailConnect)
- * - Crew profile updates (display name, mobile, skill, etc.)
- * - Boat profile updates (display name, mobile, berths, etc.)
+ * - Crew profile updates (display name, skill, etc.)
+ * - Boat profile updates (display name, berths, etc.)
  * - Validation scenarios
  * - Edge cases and error conditions
  */
@@ -75,7 +75,7 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         bool $isAdmin = false,  // Match base class signature
         bool $createCrewProfile = false,
         bool $createBoatProfile = false
-    ): int {
+    ): string {
         // Use base class to create user
         $userId = parent::createTestUser($email, $accountType, $isAdmin);
 
@@ -95,30 +95,26 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
     /**
      * Create crew profile for user
      */
-    protected function createCrewProfileForUser(int $userId, array $overrides = []): int
+    protected function createCrewProfileForUser(string $userId, array $overrides = []): int
     {
         $key = $overrides['key'] ?? 'crew_' . $userId;
 
         $stmt = $this->pdo->prepare('
             INSERT INTO crews (
-                key, display_name, first_name, last_name, skill, mobile,
-                membership_number, social_preference, experience,
+                key, display_name, skill, social_preference, experience,
                 user_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ');
 
         $stmt->execute([
             $key,
             $overrides['displayName'] ?? 'TestCrew',
-            $overrides['firstName'] ?? 'Test',
-            $overrides['lastName'] ?? 'Crew',
             $overrides['skill'] ?? SkillLevel::INTERMEDIATE->value,
-            $overrides['mobile'] ?? '555-1234',
-            $overrides['membershipNumber'] ?? '12345',
             $overrides['socialPreference'] ?? 'No', // Must be 'Yes' or 'No'
             $overrides['experience'] ?? 'Some sailing experience',
             $userId
         ]);
+        $this->linkIdentity('crews', (int)$this->pdo->lastInsertId(), ['first_name' => $overrides['firstName'] ?? 'Test', 'last_name' => $overrides['lastName'] ?? 'Crew', 'mobile_number' => $overrides['mobile'] ?? '555-1234', 'membership_number' => $overrides['membershipNumber'] ?? '12345']);
 
         return (int)$this->pdo->lastInsertId();
     }
@@ -126,30 +122,28 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
     /**
      * Create boat profile for user
      */
-    protected function createBoatProfileForUser(int $userId, array $overrides = []): int
+    protected function createBoatProfileForUser(string $userId, array $overrides = []): int
     {
         $key = $overrides['key'] ?? 'boat_' . $userId;
 
         $stmt = $this->pdo->prepare('
             INSERT INTO boats (
-                key, display_name, owner_first_name, owner_last_name, owner_mobile,
+                key, display_name,
                 min_berths, max_berths, assistance_required, social_preference,
                 owner_user_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ');
 
         $stmt->execute([
             $key,
             $overrides['displayName'] ?? 'TestBoat',
-            $overrides['ownerFirstName'] ?? 'Test',
-            $overrides['ownerLastName'] ?? 'Owner',
-            $overrides['ownerMobile'] ?? '555-5678',
             $overrides['minBerths'] ?? 2,
             $overrides['maxBerths'] ?? 4,
             $overrides['assistanceRequired'] ?? 'No', // Must be 'Yes' or 'No'
             $overrides['socialPreference'] ?? 'No', // Must be 'Yes' or 'No'
             $userId
         ]);
+        $this->linkIdentity('boats', (int)$this->pdo->lastInsertId(), ['first_name' => $overrides['ownerFirstName'] ?? 'Test', 'last_name' => $overrides['ownerLastName'] ?? 'Owner', 'mobile_number' => $overrides['ownerMobile'] ?? '555-5678']);
 
         return (int)$this->pdo->lastInsertId();
     }
@@ -157,7 +151,7 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
     /**
      * Get user email from database
      */
-    protected function getUserEmail(int $userId): string
+    protected function getUserEmail(string $userId): string
     {
         $stmt = $this->pdo->prepare('SELECT email FROM users WHERE id = ?');
         $stmt->execute([$userId]);
@@ -167,7 +161,7 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
     /**
      * Get crew display name from database
      */
-    protected function getCrewDisplayName(int $userId): ?string
+    protected function getCrewDisplayName(string $userId): ?string
     {
         $stmt = $this->pdo->prepare('SELECT display_name FROM crews WHERE user_id = ?');
         $stmt->execute([$userId]);
@@ -178,7 +172,7 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
     /**
      * Get boat display name from database
      */
-    protected function getBoatDisplayName(int $userId): ?string
+    protected function getBoatDisplayName(string $userId): ?string
     {
         $stmt = $this->pdo->prepare('SELECT display_name FROM boats WHERE owner_user_id = ?');
         $stmt->execute([$userId]);
@@ -189,7 +183,7 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
     /**
      * Get crew membership_rank value from database
      */
-    protected function getCrewRankMembership(int $userId): int
+    protected function getCrewRankMembership(string $userId): int
     {
         $stmt = $this->pdo->prepare('SELECT membership_rank FROM crews WHERE user_id = ?');
         $stmt->execute([$userId]);
@@ -238,7 +232,7 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         $this->assertSame($before->getFirstName(), $response->crewProfile->firstName);
         $this->assertSame($before->getLastName(), $response->crewProfile->lastName);
         $this->assertSame($before->getMembershipNumber(), $response->crewProfile->membershipNumber);
-        $this->assertSame('555-1212', $response->crewProfile->mobile);
+        $this->assertSame($before->getMobile(), $response->crewProfile->mobile);
     }
 
     public function testUpdateCrewProfileOnly(): void
@@ -248,7 +242,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         $request = new UpdateProfileRequest(
             crewProfile: [
                 'displayName' => 'Updated Crew Name',
-                'mobile' => '555-9999',
                 'skill' => SkillLevel::ADVANCED->value,
                 'socialPreference' => false,
             ]
@@ -260,7 +253,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         // Assert
         $this->assertNotNull($response->crewProfile);
         $this->assertEquals('Updated Crew Name', $response->crewProfile->displayName);
-        $this->assertEquals('555-9999', $response->crewProfile->mobile);
         $this->assertEquals(SkillLevel::ADVANCED->value, $response->crewProfile->skill);
     }
 
@@ -271,7 +263,6 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         $request = new UpdateProfileRequest(
             boatProfile: [
                 'displayName' => 'Updated Boat Name',
-                'ownerMobile' => '555-8888',
                 'minBerths' => 3,
                 'maxBerths' => 6,
                 'assistanceRequired' => true,
@@ -285,16 +276,16 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         // Assert
         $this->assertNotNull($response->boatProfile);
         $this->assertEquals('Updated Boat Name', $response->boatProfile->displayName);
-        $this->assertEquals('555-8888', $response->boatProfile->ownerMobile);
         $this->assertEquals(3, $response->boatProfile->minBerths);
         $this->assertEquals(6, $response->boatProfile->maxBerths);
         $this->assertTrue($response->boatProfile->assistanceRequired);
     }
 
-    public function testUpdateCrewProfileWithDisplayNameAndMobile(): void
+    public function testMobileIsOwnedBySailConnectAndNotUpdatedHere(): void
     {
         // Arrange
         $userId = $this->createTestUser('user@example.com', 'crew', createCrewProfile: true);
+        $originalMobile = $this->crewRepository->findByUserId($userId)->getMobile();
         $request = new UpdateProfileRequest(
             crewProfile: [
                 'displayName' => 'New Display Name',
@@ -307,7 +298,8 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
 
         // Assert
         $this->assertEquals('New Display Name', $response->crewProfile->displayName);
-        $this->assertEquals('555-7777', $response->crewProfile->mobile);
+        $this->assertSame($originalMobile, $response->crewProfile->mobile);
+        $this->assertNotSame('555-7777', $response->crewProfile->mobile);
     }
 
     public function testUpdateBoatProfileWithDisplayNameAndBerths(): void
@@ -412,7 +404,7 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
     public function testUserNotFoundThrowsRuntimeException(): void
     {
         // Arrange
-        $nonExistentUserId = 99999;
+        $nonExistentUserId = 'user-99999';
         $request = new UpdateProfileRequest(
             crewProfile: ['mobile' => '555-0000']
         );
@@ -535,7 +527,7 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
 
         $request = new UpdateProfileRequest(
             crewProfile: [
-                'mobile' => '555-1111' // Only update mobile
+                'skill' => SkillLevel::ADVANCED->value // Only update skill
                 // displayName not provided, should remain unchanged
             ]
         );
@@ -544,7 +536,7 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         $response = $this->useCase->execute($userId, $request);
 
         // Assert
-        $this->assertEquals('555-1111', $response->crewProfile->mobile);
+        $this->assertEquals(SkillLevel::ADVANCED->value, $response->crewProfile->skill);
         $this->assertEquals($originalDisplayName, $response->crewProfile->displayName);
     }
 
@@ -556,7 +548,7 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
 
         $request = new UpdateProfileRequest(
             boatProfile: [
-                'ownerMobile' => '555-2222' // Only update mobile
+                'maxBerths' => 5 // Only update berths
                 // displayName not provided, should remain unchanged
             ]
         );
@@ -565,7 +557,7 @@ class UpdateUserProfileUseCaseTest extends IntegrationTestCase
         $response = $this->useCase->execute($userId, $request);
 
         // Assert
-        $this->assertEquals('555-2222', $response->boatProfile->ownerMobile);
+        $this->assertEquals(5, $response->boatProfile->maxBerths);
         $this->assertEquals($originalDisplayName, $response->boatProfile->displayName);
     }
 

@@ -55,7 +55,7 @@ class SendCrewReminderUseCaseTest extends TestCase
         ];
     }
 
-    private function makeCrew(string $key = 'john-doe', ?int $userId = 1): Crew
+    private function makeCrew(string $key = 'john-doe', ?string $userId = 'user-1'): Crew
     {
         $crew = new Crew(
             key: CrewKey::fromString($key),
@@ -73,11 +73,10 @@ class SendCrewReminderUseCaseTest extends TestCase
         return $crew;
     }
 
-    private function makeUser(int $id = 1, string $email = 'john@example.com'): User
+    private function makeUser(string $id = 'user-1', string $email = 'john@example.com'): User
     {
         $user = new User(
             email: $email,
-            passwordHash: 'hash',
             accountType: 'crew',
             isAdmin: false
         );
@@ -138,11 +137,11 @@ class SendCrewReminderUseCaseTest extends TestCase
     public function testSkipsCrewWhenUserNotFound(): void
     {
         $eventId = EventId::fromString('Fri May 29');
-        $crew    = $this->makeCrew('john-doe', 99);
+        $crew    = $this->makeCrew('john-doe', 'user-99');
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->crewRepository->method('findAvailableForEvent')->willReturn([$crew]);
-        $this->userRepository->method('findById')->with(99)->willReturn(null);
+        $this->userRepository->method('findById')->with('user-99')->willReturn(null);
 
         $this->emailService->expects($this->never())->method('send');
 
@@ -156,16 +155,16 @@ class SendCrewReminderUseCaseTest extends TestCase
     public function testSendsEmailToEachRegisteredCrew(): void
     {
         $eventId = EventId::fromString('Fri May 29');
-        $crew1   = $this->makeCrew('john-doe', 1);
-        $crew2   = $this->makeCrew('jane-smith', 2);
-        $user1   = $this->makeUser(1, 'john@example.com');
-        $user2   = $this->makeUser(2, 'jane@example.com');
+        $crew1   = $this->makeCrew('john-doe', 'user-1');
+        $crew2   = $this->makeCrew('jane-smith', 'user-2');
+        $user1   = $this->makeUser('user-1', 'john@example.com');
+        $user2   = $this->makeUser('user-2', 'jane@example.com');
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->crewRepository->method('findAvailableForEvent')->willReturn([$crew1, $crew2]);
 
         $this->userRepository->method('findById')
-            ->willReturnMap([[1, $user1], [2, $user2]]);
+            ->willReturnMap([['user-1', $user1], ['user-2', $user2]]);
 
         $this->emailTemplateService->method('renderCrewReminderNotification')
             ->willReturn('<html>reminder</html>');
@@ -183,8 +182,8 @@ class SendCrewReminderUseCaseTest extends TestCase
     public function testCountsFailedSendsAsSkipped(): void
     {
         $eventId = EventId::fromString('Fri May 29');
-        $crew    = $this->makeCrew('john-doe', 1);
-        $user    = $this->makeUser(1, 'john@example.com');
+        $crew    = $this->makeCrew('john-doe', 'user-1');
+        $user    = $this->makeUser('user-1', 'john@example.com');
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->crewRepository->method('findAvailableForEvent')->willReturn([$crew]);

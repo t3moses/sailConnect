@@ -61,19 +61,19 @@ class AdminUseCaseTest extends IntegrationTestCase
         $this->createTestEvent('Fri May 15', '2026-05-15');
 
         // Create users
-        $boatOwner1 = new User('boatowner1@example.com', 'hash', 'boat_owner', false);
+        $boatOwner1 = $this->newUser('boatowner1@example.com', 'boat_owner', false);
         $this->userRepository->save($boatOwner1);
 
-        $boatOwner2 = new User('boatowner2@example.com', 'hash', 'boat_owner', false);
+        $boatOwner2 = $this->newUser('boatowner2@example.com', 'boat_owner', false);
         $this->userRepository->save($boatOwner2);
 
-        $crewUser1 = new User('crew1@example.com', 'hash', 'crew', false);
+        $crewUser1 = $this->newUser('crew1@example.com', 'crew', false);
         $this->userRepository->save($crewUser1);
 
-        $crewUser2 = new User('crew2@example.com', 'hash', 'crew', false);
+        $crewUser2 = $this->newUser('crew2@example.com', 'crew', false);
         $this->userRepository->save($crewUser2);
 
-        $crewUser3 = new User('crew3@example.com', 'hash', 'crew', false);
+        $crewUser3 = $this->newUser('crew3@example.com', 'crew', false);
         $this->userRepository->save($crewUser3);
 
         // Create boats
@@ -89,6 +89,7 @@ class AdminUseCaseTest extends IntegrationTestCase
             socialPreference: false
         );
         $boat1->setOwnerUserId($boatOwner1->getId());
+        $this->updateIdentity($boatOwner1->getId(), ['first_name' => 'Owner', 'last_name' => 'One', 'mobile_number' => '555-0001']);
         $this->boatRepository->save($boat1);
 
         $boat2 = new Boat(
@@ -103,6 +104,7 @@ class AdminUseCaseTest extends IntegrationTestCase
             socialPreference: false
         );
         $boat2->setOwnerUserId($boatOwner2->getId());
+        $this->updateIdentity($boatOwner2->getId(), ['first_name' => 'Owner', 'last_name' => 'Two', 'mobile_number' => '555-0002']);
         $this->boatRepository->save($boat2);
 
         // Create crews
@@ -119,6 +121,7 @@ class AdminUseCaseTest extends IntegrationTestCase
             experience: null
         );
         $crew1->setUserId($crewUser1->getId());
+        $this->updateIdentity($crewUser1->getId(), ['first_name' => 'Alice', 'last_name' => 'Smith', 'mobile_number' => '1234567890', 'membership_number' => 'M001']);
         $this->crewRepository->save($crew1);
 
         $crew2 = new Crew(
@@ -134,6 +137,7 @@ class AdminUseCaseTest extends IntegrationTestCase
             experience: null
         );
         $crew2->setUserId($crewUser2->getId());
+        $this->updateIdentity($crewUser2->getId(), ['first_name' => 'Bob', 'last_name' => 'Jones', 'mobile_number' => '1234567891', 'membership_number' => 'M002']);
         $this->crewRepository->save($crew2);
 
         $crew3 = new Crew(
@@ -149,6 +153,7 @@ class AdminUseCaseTest extends IntegrationTestCase
             experience: null
         );
         $crew3->setUserId($crewUser3->getId());
+        $this->updateIdentity($crewUser3->getId(), ['first_name' => 'Charlie', 'last_name' => 'Brown', 'mobile_number' => '1234567892', 'membership_number' => 'M003']);
         $this->crewRepository->save($crew3);
 
         // Set boat availability (both boats available)
@@ -216,7 +221,7 @@ class AdminUseCaseTest extends IntegrationTestCase
 
         // Create 10 additional crews
         for ($i = 4; $i <= 13; $i++) {
-            $user = new User("crew{$i}@example.com", 'hash', 'crew', false);
+            $user = $this->newUser("crew{$i}@example.com", 'crew', false);
             $this->userRepository->save($user);
 
             $crew = new Crew(
@@ -232,6 +237,7 @@ class AdminUseCaseTest extends IntegrationTestCase
                 experience: null
             );
             $crew->setUserId($user->getId());
+            $this->updateIdentity($user->getId(), ['first_name' => "Crew{$i}", 'last_name' => "Test", 'mobile_number' => null, 'membership_number' => "M{$i}"]);
             $crew->setAvailability($eventId, AvailabilityStatus::NOT_SELECTED);
             $this->crewRepository->save($crew);
         }

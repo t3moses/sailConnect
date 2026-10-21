@@ -72,7 +72,6 @@ class AuthApiTest extends TestCase
             'accountType' => 'boat_owner',
             'profile' => [
                 'displayName' => "Sea Breeze {$suffix}",
-                'ownerMobile' => '555-1234',
                 'minBerths' => 2,
                 'maxBerths' => 4,
             ],

@@ -71,7 +71,7 @@ class CrewQueryUseCaseTest extends IntegrationTestCase
         $this->createTestEvent('Fri May 29', '2026-05-29');
 
         // Create test user and crew
-        $user = new User('testcrew@example.com', 'hash', 'crew', false);
+        $user = $this->newUser('testcrew@example.com', 'crew', false);
         $this->userRepository->save($user);
 
         $crew = new Crew(
@@ -87,6 +87,7 @@ class CrewQueryUseCaseTest extends IntegrationTestCase
             experience: null
         );
         $crew->setUserId($user->getId());
+        $this->updateIdentity($user->getId(), ['first_name' => 'John', 'last_name' => 'Sailor', 'mobile_number' => '1234567890', 'membership_number' => 'M123']);
 
         // Set availability for events
         $crew->setAvailability(EventId::fromString('Fri May 15'), AvailabilityStatus::NOT_SELECTED);
@@ -102,7 +103,7 @@ class CrewQueryUseCaseTest extends IntegrationTestCase
     {
         $this->expectException(CrewNotFoundException::class);
 
-        $this->getCrewAvailabilityUseCase->execute(999999);
+        $this->getCrewAvailabilityUseCase->execute('user-999999');
     }
 
     public function testGetCrewAvailabilityReturnsAvailabilityResponse(): void
@@ -157,7 +158,7 @@ class CrewQueryUseCaseTest extends IntegrationTestCase
     public function testGetCrewAvailabilityHandlesNoAvailabilitySet(): void
     {
         // Create new user and crew without availability
-        $newUser = new User('newcrew@example.com', 'hash', 'crew', false);
+        $newUser = $this->newUser('newcrew@example.com', 'crew', false);
         $this->userRepository->save($newUser);
 
         $newCrew = new Crew(
@@ -173,6 +174,7 @@ class CrewQueryUseCaseTest extends IntegrationTestCase
             experience: null
         );
         $newCrew->setUserId($newUser->getId());
+        $this->updateIdentity($newUser->getId(), ['first_name' => 'Jane', 'last_name' => 'Doe', 'mobile_number' => null, 'membership_number' => 'M456']);
         $this->crewRepository->save($newCrew);
 
         $response = $this->getCrewAvailabilityUseCase->execute($newUser->getId());
@@ -187,7 +189,7 @@ class CrewQueryUseCaseTest extends IntegrationTestCase
     public function testGetUserAssignmentsReturnsEmptyArrayWhenUserNotFound(): void
     {
         // Users who are neither crew nor boat owners should get an empty array
-        $assignments = $this->getUserAssignmentsUseCase->execute(999999);
+        $assignments = $this->getUserAssignmentsUseCase->execute('user-999999');
 
         $this->assertIsArray($assignments);
         $this->assertEmpty($assignments);

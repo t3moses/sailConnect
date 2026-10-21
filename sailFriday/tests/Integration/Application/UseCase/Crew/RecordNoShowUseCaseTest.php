@@ -55,27 +55,26 @@ class RecordNoShowUseCaseTest extends IntegrationTestCase
 
     // ==================== HELPER METHODS ====================
 
-    protected function createCrewProfileForUser(int $userId, array $overrides = []): string
+    protected function createCrewProfileForUser(string $userId, array $overrides = []): string
     {
         $key = $overrides['key'] ?? 'crew_' . $userId;
         $initialCommitmentRank = $overrides['initialCommitmentRank'] ?? 2;
 
         $stmt = $this->pdo->prepare('
             INSERT INTO crews (
-                key, display_name, first_name, last_name, skill,
+                key, display_name, skill,
                 commitment_rank, initial_commitment_rank, user_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ');
         $stmt->execute([
             $key,
             $overrides['displayName'] ?? 'Test Crew',
-            'Test',
-            'Crew',
             1,
             $initialCommitmentRank,
             $initialCommitmentRank,
-            $userId,
+            $userId
         ]);
+        $this->linkIdentity('crews', (int)$this->pdo->lastInsertId(), ['first_name' => 'Test', 'last_name' => 'Crew']);
 
         return $key;
     }

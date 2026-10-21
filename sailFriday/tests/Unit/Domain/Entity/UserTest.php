@@ -11,13 +11,11 @@ class UserTest extends TestCase
 {
     private function createUser(
         string $email = 'john.doe@example.com',
-        string $passwordHash = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
         string $accountType = 'crew',
         bool $isAdmin = false
     ): User {
         return new User(
             email: $email,
-            passwordHash: $passwordHash,
             accountType: $accountType,
             isAdmin: $isAdmin
         );
@@ -30,7 +28,6 @@ class UserTest extends TestCase
 
         // Assert
         $this->assertEquals('john.doe@example.com', $user->getEmail());
-        $this->assertEquals('$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', $user->getPasswordHash());
         $this->assertEquals('crew', $user->getAccountType());
         $this->assertFalse($user->isAdmin());
     }
@@ -43,28 +40,6 @@ class UserTest extends TestCase
         // Assert
         $this->assertInstanceOf(\DateTimeImmutable::class, $user->getCreatedAt());
         $this->assertInstanceOf(\DateTimeImmutable::class, $user->getUpdatedAt());
-        $this->assertNull($user->getLastLogin());
-    }
-
-    public function testConstructorAcceptsCustomTimestamps(): void
-    {
-        // Arrange
-        $createdAt = new \DateTimeImmutable('2024-01-01 12:00:00');
-        $updatedAt = new \DateTimeImmutable('2024-01-02 12:00:00');
-
-        $user = new User(
-            email: 'test@example.com',
-            passwordHash: 'hash123',
-            accountType: 'crew',
-            isAdmin: false,
-            lastLogin: null,
-            createdAt: $createdAt,
-            updatedAt: $updatedAt
-        );
-
-        // Assert
-        $this->assertEquals($createdAt, $user->getCreatedAt());
-        $this->assertEquals($updatedAt, $user->getUpdatedAt());
     }
 
     public function testIdStartsAsNull(): void
@@ -80,59 +55,23 @@ class UserTest extends TestCase
     {
         // Arrange
         $user = $this->createUser();
-        $user->setId(42);
+        $user->setId('user-42');
 
         // Assert
-        $this->assertEquals(42, $user->getId());
+        $this->assertEquals('user-42', $user->getId());
     }
 
     public function testSetIdThrowsExceptionWhenAlreadySet(): void
     {
         // Arrange
         $user = $this->createUser();
-        $user->setId(42);
+        $user->setId('user-42');
 
         // Assert
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('User ID is already set');
 
-        $user->setId(43);
-    }
-
-    public function testSetEmailUpdatesEmail(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-
-        $user->setEmail('newemail@example.com');
-
-        // Assert
-        $this->assertEquals('newemail@example.com', $user->getEmail());
-    }
-
-    public function testSetEmailUpdatesTimestamp(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-        $originalUpdatedAt = $user->getUpdatedAt();
-
-        sleep(1);
-        $user->setEmail('newemail@example.com');
-
-        // Assert
-        $this->assertGreaterThan($originalUpdatedAt, $user->getUpdatedAt());
-    }
-
-    public function testSetEmailValidatesEmail(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-
-        // Assert
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid email format');
-
-        $user->setEmail('invalid-email');
+        $user->setId('user-43');
     }
 
     public function testConstructorThrowsExceptionForEmptyEmail(): void
@@ -144,7 +83,6 @@ class UserTest extends TestCase
 
         new User(
             email: '',
-            passwordHash: 'hash123',
             accountType: 'crew'
         );
     }
@@ -158,46 +96,8 @@ class UserTest extends TestCase
 
         new User(
             email: 'not-an-email',
-            passwordHash: 'hash123',
             accountType: 'crew'
         );
-    }
-
-    public function testSetPasswordHashUpdatesHash(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-
-        $newHash = '$2y$10$newHashValue';
-        $user->setPasswordHash($newHash);
-
-        // Assert
-        $this->assertEquals($newHash, $user->getPasswordHash());
-    }
-
-    public function testSetPasswordHashUpdatesTimestamp(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-        $originalUpdatedAt = $user->getUpdatedAt();
-
-        sleep(1);
-        $user->setPasswordHash('$2y$10$newHashValue');
-
-        // Assert
-        $this->assertGreaterThan($originalUpdatedAt, $user->getUpdatedAt());
-    }
-
-    public function testSetPasswordHashThrowsExceptionForEmptyHash(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-
-        // Assert
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Password hash cannot be empty');
-
-        $user->setPasswordHash('');
     }
 
     public function testSetAccountTypeUpdatesType(): void
@@ -233,7 +133,6 @@ class UserTest extends TestCase
 
         new User(
             email: 'test@example.com',
-            passwordHash: 'hash123',
             accountType: 'invalid'
         );
     }
@@ -312,75 +211,6 @@ class UserTest extends TestCase
         $this->assertFalse($user->canManageBoat());
     }
 
-    public function testUpdateLastLoginSetsTimestamp(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-
-        // Assert
-        $this->assertNull($user->getLastLogin());
-
-        $loginTime = new \DateTimeImmutable('2024-01-15 10:30:00');
-        $user->updateLastLogin($loginTime);
-
-        $this->assertEquals($loginTime, $user->getLastLogin());
-    }
-
-    public function testUpdateLastLoginUpdatesTimestamp(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-        $originalUpdatedAt = $user->getUpdatedAt();
-
-        sleep(1);
-        $user->updateLastLogin(new \DateTimeImmutable());
-
-        // Assert
-        $this->assertGreaterThan($originalUpdatedAt, $user->getUpdatedAt());
-    }
-
-    public function testToArrayReturnsCompleteArray(): void
-    {
-        // Arrange
-        $createdAt = new \DateTimeImmutable('2024-01-01 12:00:00');
-        $updatedAt = new \DateTimeImmutable('2024-01-02 12:00:00');
-        $lastLogin = new \DateTimeImmutable('2024-01-15 10:30:00');
-
-        $user = new User(
-            email: 'test@example.com',
-            passwordHash: 'hash123',
-            accountType: 'crew',
-            isAdmin: true,
-            lastLogin: $lastLogin,
-            createdAt: $createdAt,
-            updatedAt: $updatedAt
-        );
-        $user->setId(42);
-
-        $array = $user->toArray();
-
-        // Assert
-        $this->assertEquals(42, $array['id']);
-        $this->assertEquals('test@example.com', $array['email']);
-        $this->assertEquals('crew', $array['account_type']);
-        $this->assertTrue($array['is_admin']);
-        $this->assertEquals('2024-01-15 10:30:00', $array['last_login']);
-        $this->assertEquals('2024-01-01 12:00:00', $array['created_at']);
-        $this->assertEquals('2024-01-02 12:00:00', $array['updated_at']);
-    }
-
-    public function testToArrayWithNullLastLogin(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-        $user->setId(1);
-
-        $array = $user->toArray();
-
-        // Assert
-        $this->assertNull($array['last_login']);
-    }
-
     public function testToArrayWithNullId(): void
     {
         // Arrange
@@ -443,92 +273,5 @@ class UserTest extends TestCase
         $user->setIsAdmin(false);
 
         $this->assertFalse($user->isAdmin());
-    }
-
-    public function testGetLastLogoutReturnsNullByDefault(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-
-        // Assert
-        $this->assertNull($user->getLastLogout());
-    }
-
-    public function testUpdateLastLogoutSetsTimestamp(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-
-        // Assert
-        $this->assertNull($user->getLastLogout());
-
-        $logoutTime = new \DateTimeImmutable('2024-01-15 14:30:00');
-        $user->updateLastLogout($logoutTime);
-
-        $this->assertEquals($logoutTime, $user->getLastLogout());
-    }
-
-    public function testUpdateLastLogoutUpdatesTimestamp(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-        $originalUpdatedAt = $user->getUpdatedAt();
-
-        sleep(1);
-        $user->updateLastLogout(new \DateTimeImmutable());
-
-        // Assert
-        $this->assertGreaterThan($originalUpdatedAt, $user->getUpdatedAt());
-    }
-
-    public function testConstructorAcceptsLastLogout(): void
-    {
-        // Arrange
-        $lastLogout = new \DateTimeImmutable('2024-01-15 14:30:00');
-
-        $user = new User(
-            email: 'test@example.com',
-            passwordHash: 'hash123',
-            accountType: 'crew',
-            isAdmin: false,
-            lastLogin: null,
-            lastLogout: $lastLogout
-        );
-
-        // Assert
-        $this->assertEquals($lastLogout, $user->getLastLogout());
-    }
-
-    public function testToArrayIncludesLastLogout(): void
-    {
-        // Arrange
-        $lastLogout = new \DateTimeImmutable('2024-01-15 14:30:00');
-
-        $user = new User(
-            email: 'test@example.com',
-            passwordHash: 'hash123',
-            accountType: 'crew',
-            isAdmin: false,
-            lastLogin: null,
-            lastLogout: $lastLogout
-        );
-        $user->setId(42);
-
-        $array = $user->toArray();
-
-        // Assert
-        $this->assertEquals('2024-01-15 14:30:00', $array['last_logout']);
-    }
-
-    public function testToArrayWithNullLastLogout(): void
-    {
-        // Arrange
-        $user = $this->createUser();
-        $user->setId(1);
-
-        $array = $user->toArray();
-
-        // Assert
-        $this->assertNull($array['last_logout']);
     }
 }

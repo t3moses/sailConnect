@@ -14,11 +14,10 @@ use Psr\Log\LoggerInterface;
 
 class NotifyUserUseCaseTest extends TestCase
 {
-    private function createUser(int $id, string $email = 'target@example.com'): User
+    private function createUser(string $id, string $email = 'target@example.com'): User
     {
         $user = new User(
             email: $email,
-            passwordHash: 'hashed_password',
             accountType: 'crew',
             isAdmin: false,
         );
@@ -47,25 +46,25 @@ class NotifyUserUseCaseTest extends TestCase
 
         $this->expectException(ValidationException::class);
 
-        $useCase->execute(targetUserId: 5, subject: '  ', message: 'hello');
+        $useCase->execute(targetUserId: 'user-5', subject: '  ', message: 'hello');
     }
 
     public function testThrowsRuntimeExceptionWhenUserNotFound(): void
     {
         $userRepository = $this->createMock(UserRepositoryInterface::class);
-        $userRepository->method('findById')->with(999)->willReturn(null);
+        $userRepository->method('findById')->with('user-999')->willReturn(null);
 
         $useCase = $this->makeUseCase($userRepository);
 
         $this->expectException(\RuntimeException::class);
 
-        $useCase->execute(targetUserId: 999, subject: 'Hi', message: 'hello');
+        $useCase->execute(targetUserId: 'user-999', subject: 'Hi', message: 'hello');
     }
 
     public function testSendsEmailToTheUserAccountAddress(): void
     {
         $userRepository = $this->createMock(UserRepositoryInterface::class);
-        $userRepository->method('findById')->with(5)->willReturn($this->createUser(5, 'jane@example.com'));
+        $userRepository->method('findById')->with('user-5')->willReturn($this->createUser('user-5', 'jane@example.com'));
 
         $emailService = $this->createMock(EmailServiceInterface::class);
         $emailService->expects($this->once())
@@ -80,7 +79,7 @@ class NotifyUserUseCaseTest extends TestCase
         $useCase = $this->makeUseCase($userRepository, $emailService);
 
         $result = $useCase->execute(
-            targetUserId: 5,
+            targetUserId: 'user-5',
             subject: 'NSC Sail Friday',
             message: "Hello,\nSee you Saturday.",
         );
@@ -91,14 +90,14 @@ class NotifyUserUseCaseTest extends TestCase
     public function testReportsFailureWhenEmailServiceReturnsFalse(): void
     {
         $userRepository = $this->createMock(UserRepositoryInterface::class);
-        $userRepository->method('findById')->with(5)->willReturn($this->createUser(5));
+        $userRepository->method('findById')->with('user-5')->willReturn($this->createUser('user-5'));
 
         $emailService = $this->createMock(EmailServiceInterface::class);
         $emailService->method('send')->willReturn(false);
 
         $useCase = $this->makeUseCase($userRepository, $emailService);
 
-        $result = $useCase->execute(targetUserId: 5, subject: 'Hi', message: 'hello');
+        $result = $useCase->execute(targetUserId: 'user-5', subject: 'Hi', message: 'hello');
 
         $this->assertSame(0, $result['emails_sent']);
     }

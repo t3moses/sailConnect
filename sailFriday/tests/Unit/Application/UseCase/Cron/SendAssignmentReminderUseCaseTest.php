@@ -61,7 +61,7 @@ class SendAssignmentReminderUseCaseTest extends TestCase
         ];
     }
 
-    private function makeCrew(string $firstName, string $lastName, ?int $userId, string $key = 'crew-key'): array
+    private function makeCrew(string $firstName, string $lastName, ?string $userId, string $key = 'crew-key'): array
     {
         return [
             'key'        => $key,
@@ -82,11 +82,10 @@ class SendAssignmentReminderUseCaseTest extends TestCase
         ];
     }
 
-    private function makeUser(int $id, string $email): User
+    private function makeUser(string $id, string $email): User
     {
         $user = new User(
             email: $email,
-            passwordHash: 'hash',
             accountType: 'crew',
             isAdmin: false
         );
@@ -148,12 +147,12 @@ class SendAssignmentReminderUseCaseTest extends TestCase
     public function testSkipsCrewWhenUserNotFound(): void
     {
         $boat = $this->makeCrewedBoat('Sailaway', 'Robert', [
-            $this->makeCrew('John', 'Doe', 99),
+            $this->makeCrew('John', 'Doe', 'user-99'),
         ]);
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->seasonRepository->method('getFlotilla')->willReturn($this->makeFlotilla([$boat]));
-        $this->userRepository->method('findById')->with(99)->willReturn(null);
+        $this->userRepository->method('findById')->with('user-99')->willReturn(null);
         $this->emailService->expects($this->never())->method('send');
 
         $result = $this->useCase->execute(EventId::fromString('Fri May 29'));
@@ -166,19 +165,19 @@ class SendAssignmentReminderUseCaseTest extends TestCase
     public function testSendsIndividualEmailToEachAssignedCrew(): void
     {
         $boat1 = $this->makeCrewedBoat('Sailaway', 'Robert', [
-            $this->makeCrew('John', 'Doe', 1, 'john-doe'),
-            $this->makeCrew('Jane', 'Smith', 2, 'jane-smith'),
+            $this->makeCrew('John', 'Doe', 'user-1', 'john-doe'),
+            $this->makeCrew('Jane', 'Smith', 'user-2', 'jane-smith'),
         ]);
         $boat2 = $this->makeCrewedBoat('Windward', 'Alice', [
-            $this->makeCrew('Bob', 'Jones', 3, 'bob-jones'),
+            $this->makeCrew('Bob', 'Jones', 'user-3', 'bob-jones'),
         ]);
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->seasonRepository->method('getFlotilla')->willReturn($this->makeFlotilla([$boat1, $boat2]));
         $this->userRepository->method('findById')->willReturnMap([
-            [1, $this->makeUser(1, 'john@example.com')],
-            [2, $this->makeUser(2, 'jane@example.com')],
-            [3, $this->makeUser(3, 'bob@example.com')],
+            ['user-1', $this->makeUser('user-1', 'john@example.com')],
+            ['user-2', $this->makeUser('user-2', 'jane@example.com')],
+            ['user-3', $this->makeUser('user-3', 'bob@example.com')],
         ]);
         $this->emailTemplateService->method('renderAssignmentReminderNotification')->willReturn('<html/>');
 
@@ -193,12 +192,12 @@ class SendAssignmentReminderUseCaseTest extends TestCase
     public function testPassesBoatAndOwnerToTemplate(): void
     {
         $boat = $this->makeCrewedBoat('Sailaway', 'Robert', [
-            $this->makeCrew('John', 'Doe', 1, 'john-doe'),
+            $this->makeCrew('John', 'Doe', 'user-1', 'john-doe'),
         ]);
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->seasonRepository->method('getFlotilla')->willReturn($this->makeFlotilla([$boat]));
-        $this->userRepository->method('findById')->willReturn($this->makeUser(1, 'john@example.com'));
+        $this->userRepository->method('findById')->willReturn($this->makeUser('user-1', 'john@example.com'));
 
         $this->emailTemplateService->expects($this->once())
             ->method('renderAssignmentReminderNotification')
@@ -214,12 +213,12 @@ class SendAssignmentReminderUseCaseTest extends TestCase
     public function testCountsFailedSendsAsSkipped(): void
     {
         $boat = $this->makeCrewedBoat('Sailaway', 'Robert', [
-            $this->makeCrew('John', 'Doe', 1, 'john-doe'),
+            $this->makeCrew('John', 'Doe', 'user-1', 'john-doe'),
         ]);
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->seasonRepository->method('getFlotilla')->willReturn($this->makeFlotilla([$boat]));
-        $this->userRepository->method('findById')->willReturn($this->makeUser(1, 'john@example.com'));
+        $this->userRepository->method('findById')->willReturn($this->makeUser('user-1', 'john@example.com'));
         $this->emailTemplateService->method('renderAssignmentReminderNotification')->willReturn('<html/>');
         $this->emailService->method('send')->willReturn(false);
 

@@ -9,6 +9,8 @@ namespace Tests\Integration\Api;
  */
 trait ApiTestTrait
 {
+    private const AUTH_MOBILE = '613-555-0100';
+
     private function makeRequest(string $method, string $url, ?array $body = null, ?array $headers = []): array
     {
         $ch = curl_init($url);
@@ -58,7 +60,7 @@ trait ApiTestTrait
      * Create a sailConnect identity plus a live session directly in the auth database the dev server uses
      * (auth/.env). Returns the raw session token to send as the sc_session cookie.
      *
-     * @return array{token:string, authUserId:string, email:string, firstName:string, lastName:string}
+     * @return array{token:string, id:string, email:string, firstName:string, lastName:string}
      */
     private function createAuthSession(string $emailPrefix, string $firstName, string $lastName, ?string $membershipNumber = null): array
     {
@@ -74,6 +76,8 @@ trait ApiTestTrait
             'password_hash' => password_hash('TestPass123', PASSWORD_BCRYPT),
             'is_member' => $membershipNumber !== null,
             'membership_number' => $membershipNumber,
+            // Mobile number lives in sailConnect; boat owners and WhatsApp crew must have one to enroll
+            'mobile_number' => self::AUTH_MOBILE,
         ]);
         $sessions = new \SailConnect\Auth\SessionService($db, $config->inactivitySeconds(), $config->sessionMaxSeconds());
 
@@ -129,7 +133,6 @@ trait ApiTestTrait
             'accountType' => 'boat_owner',
             'profile' => [
                 'displayName' => "Test Boat {$suffix}",
-                'ownerMobile' => '555-1234',
                 'minBerths' => 2,
                 'maxBerths' => 4,
                 'assistanceRequired' => false,
@@ -158,22 +161,22 @@ trait ApiTestTrait
         // Create the Sail Friday user directly (the register endpoint never grants isAdmin)
         $pdo = \App\Infrastructure\Persistence\SQLite\Connection::getInstance();
         $stmt = $pdo->prepare('
-            INSERT INTO users (email, password_hash, account_type, is_admin, auth_user_id, created_at, updated_at)
-            VALUES (?, ?, ?, 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            INSERT INTO users (account_type, is_program_admin, auth_user_id, created_at, updated_at)
+            VALUES (?, 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ');
-        $stmt->execute([$session['email'], '', 'crew', $session['authUserId']]);
-        $userId = (int)$pdo->lastInsertId();
+        $stmt->execute(['crew', $session['authUserId']]);
+        $userId = $session['authUserId'];
 
         // Create a crew profile for the admin (required for some operations)
         $crewKey = strtolower(str_replace(' ', '', $firstName) . str_replace(' ', '', $lastName));
 
         $stmt = $pdo->prepare('
             INSERT INTO crews (
-                key, display_name, first_name, last_name, skill, user_id,
+                key, display_name, skill, user_id,
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES (?, ?, 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ');
-        $stmt->execute([$crewKey, "Admin Test {$suffix}", $firstName, $lastName, $userId]);
+        $stmt->execute([$crewKey, "Admin Test {$suffix}", $userId]);
 
         return [
             'token' => $session['token'],
@@ -185,7 +188,7 @@ trait ApiTestTrait
         ];
     }
 
-    private function cleanupTestUser(?int $userId): void
+    private function cleanupTestUser(?string $userId): void
     {
         if ($userId) {
             \Tests\Integration\UserTestHelper::deleteTestUser($userId);

@@ -90,31 +90,27 @@ class UpdateCrewAvailabilityUseCaseTest extends IntegrationTestCase
     /**
      * Create crew profile for user
      */
-    protected function createCrewProfileForUser(int $userId, array $overrides = []): string
+    protected function createCrewProfileForUser(string $userId, array $overrides = []): string
     {
         $key = $overrides['key'] ?? 'crew_' . $userId;
 
         $stmt = $this->pdo->prepare('
             INSERT INTO crews (
-                key, display_name, first_name, last_name, skill, mobile,
-                membership_number, social_preference, experience, active,
+                key, display_name, skill, social_preference, experience, active,
                 user_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ');
 
         $stmt->execute([
             $key,
             $overrides['displayName'] ?? 'Test Crew',
-            $overrides['firstName'] ?? 'Test',
-            $overrides['lastName'] ?? 'Crew',
             $overrides['skill'] ?? SkillLevel::INTERMEDIATE->value,
-            $overrides['mobile'] ?? '555-1234',
-            $overrides['membershipNumber'] ?? '12345',
             $overrides['socialPreference'] ?? 'No',
             $overrides['experience'] ?? 'Some sailing experience',
             ($overrides['active'] ?? true) ? 1 : 0,
             $userId
         ]);
+        $this->linkIdentity('crews', (int)$this->pdo->lastInsertId(), ['first_name' => $overrides['firstName'] ?? 'Test', 'last_name' => $overrides['lastName'] ?? 'Crew', 'mobile_number' => $overrides['mobile'] ?? '555-1234', 'membership_number' => $overrides['membershipNumber'] ?? '12345']);
 
         return $key;
     }
@@ -371,7 +367,7 @@ class UpdateCrewAvailabilityUseCaseTest extends IntegrationTestCase
     public function testCrewNotFoundThrowsException(): void
     {
         // Arrange
-        $nonExistentUserId = 99999;
+        $nonExistentUserId = 'user-99999';
 
         $request = new UpdateAvailabilityRequest([
             ['eventId' => 'Fri May 15', 'isAvailable' => true]
@@ -379,7 +375,7 @@ class UpdateCrewAvailabilityUseCaseTest extends IntegrationTestCase
 
         // Assert
         $this->expectException(CrewNotFoundException::class);
-        $this->expectExceptionMessage('Crew not found for user ID: 99999');
+        $this->expectExceptionMessage('Crew not found for user ID: user-99999');
 
         // Act
         $this->useCase->execute($nonExistentUserId, $request);

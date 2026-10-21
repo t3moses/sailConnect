@@ -49,7 +49,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())
             ->method('findByUserId')
-            ->with(1)
+            ->with('user-1')
             ->willReturn($crew);
 
         $eventRepository = $this->createMock(EventRepositoryInterface::class);
@@ -64,7 +64,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $useCase = new GetCrewAvailabilityUseCase($crewRepository, $eventRepository);
 
         // Act
-        $result = $useCase->execute(1);
+        $result = $useCase->execute('user-1');
 
         // Assert
         $this->assertInstanceOf(AvailabilityResponse::class, $result);
@@ -89,7 +89,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())
             ->method('findByUserId')
-            ->with(1)
+            ->with('user-1')
             ->willReturn($crew);
 
         $eventRepository = $this->createMock(EventRepositoryInterface::class);
@@ -105,7 +105,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $useCase = new GetCrewAvailabilityUseCase($crewRepository, $eventRepository);
 
         // Act
-        $result = $useCase->execute(1);
+        $result = $useCase->execute('user-1');
 
         // Assert
         $this->assertCount(4, $result->availability);
@@ -125,7 +125,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())
             ->method('findByUserId')
-            ->with(1)
+            ->with('user-1')
             ->willReturn($crew);
 
         $eventRepository = $this->createMock(EventRepositoryInterface::class);
@@ -136,7 +136,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $useCase = new GetCrewAvailabilityUseCase($crewRepository, $eventRepository);
 
         // Act
-        $result = $useCase->execute(1);
+        $result = $useCase->execute('user-1');
 
         // Assert
         $this->assertTrue($result->availability['2026-05-01']);
@@ -152,7 +152,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())
             ->method('findByUserId')
-            ->with(1)
+            ->with('user-1')
             ->willReturn($crew);
 
         $eventRepository = $this->createMock(EventRepositoryInterface::class);
@@ -163,7 +163,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $useCase = new GetCrewAvailabilityUseCase($crewRepository, $eventRepository);
 
         // Act
-        $result = $useCase->execute(1);
+        $result = $useCase->execute('user-1');
 
         // Assert
         $this->assertTrue($result->availability['2026-05-01']);
@@ -178,7 +178,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())
             ->method('findByUserId')
-            ->with(1)
+            ->with('user-1')
             ->willReturn($crew);
 
         $eventRepository = $this->createMock(EventRepositoryInterface::class);
@@ -189,7 +189,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $useCase = new GetCrewAvailabilityUseCase($crewRepository, $eventRepository);
 
         // Act
-        $result = $useCase->execute(1);
+        $result = $useCase->execute('user-1');
 
         // Assert
         $this->assertFalse($result->availability['2026-05-01']);
@@ -204,7 +204,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())
             ->method('findByUserId')
-            ->with(1)
+            ->with('user-1')
             ->willReturn($crew);
 
         $eventRepository = $this->createMock(EventRepositoryInterface::class);
@@ -215,7 +215,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $useCase = new GetCrewAvailabilityUseCase($crewRepository, $eventRepository);
 
         // Act
-        $result = $useCase->execute(1);
+        $result = $useCase->execute('user-1');
 
         // Assert
         $this->assertFalse($result->availability['2026-05-01']);
@@ -224,7 +224,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
     public function testExecuteThrowsExceptionWhenCrewNotFound(): void
     {
         // Arrange
-        $userId = 999;
+        $userId = 'user-999';
 
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())
@@ -241,7 +241,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
 
         // Assert
         $this->expectException(CrewNotFoundException::class);
-        $this->expectExceptionMessage("Crew not found for user ID: 999");
+        $this->expectExceptionMessage("Crew not found for user ID: user-999");
 
         // Act
         $useCase->execute($userId);
@@ -257,7 +257,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())
             ->method('findByUserId')
-            ->with(1)
+            ->with('user-1')
             ->willReturn($crew);
 
         $eventRepository = $this->createMock(EventRepositoryInterface::class);
@@ -271,7 +271,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $useCase = new GetCrewAvailabilityUseCase($crewRepository, $eventRepository);
 
         // Act
-        $result = $useCase->execute(1);
+        $result = $useCase->execute('user-1');
 
         // Assert
         $this->assertInstanceOf(AvailabilityResponse::class, $result);
@@ -292,7 +292,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())
             ->method('findByUserId')
-            ->with(1)
+            ->with('user-1')
             ->willReturn($crew);
 
         // No events exist in system
@@ -304,7 +304,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $useCase = new GetCrewAvailabilityUseCase($crewRepository, $eventRepository);
 
         // Act
-        $result = $useCase->execute(1);
+        $result = $useCase->execute('user-1');
 
         // Assert
         $this->assertInstanceOf(AvailabilityResponse::class, $result);
@@ -325,7 +325,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())
             ->method('findByUserId')
-            ->with(1)
+            ->with('user-1')
             ->willReturn($crew);
 
         // Event date map only contains 2 events (orphaned event missing)
@@ -341,7 +341,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $useCase = new GetCrewAvailabilityUseCase($crewRepository, $eventRepository);
 
         // Act
-        $result = $useCase->execute(1);
+        $result = $useCase->execute('user-1');
 
         // Assert
         $this->assertCount(2, $result->availability);
@@ -361,7 +361,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())
             ->method('findByUserId')
-            ->with(1)
+            ->with('user-1')
             ->willReturn($crew);
 
         $eventRepository = $this->createMock(EventRepositoryInterface::class);
@@ -372,7 +372,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $useCase = new GetCrewAvailabilityUseCase($crewRepository, $eventRepository);
 
         // Act
-        $result = $useCase->execute(1);
+        $result = $useCase->execute('user-1');
 
         // Assert
         $keys = array_keys($result->availability);
@@ -392,7 +392,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())
             ->method('findByUserId')
-            ->with(1)
+            ->with('user-1')
             ->willReturn($crew);
 
         $eventRepository = $this->createMock(EventRepositoryInterface::class);
@@ -403,7 +403,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
         $useCase = new GetCrewAvailabilityUseCase($crewRepository, $eventRepository);
 
         // Act
-        $result = $useCase->execute(1);
+        $result = $useCase->execute('user-1');
 
         // Assert
         // Expectations are verified by PHPUnit after test completion
@@ -413,7 +413,7 @@ class GetCrewAvailabilityUseCaseTest extends TestCase
     public function testExecuteDoesNotCallEventRepositoryWhenCrewNotFound(): void
     {
         // Arrange
-        $userId = 999;
+        $userId = 'user-999';
 
         $crewRepository = $this->createMock(CrewRepositoryInterface::class);
         $crewRepository->expects($this->once())

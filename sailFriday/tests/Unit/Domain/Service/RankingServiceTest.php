@@ -41,7 +41,7 @@ class RankingServiceTest extends TestCase
         return $boat;
     }
 
-    private function createCrew(string $key): Crew
+    private function createCrew(string $key, ?string $membershipNumber = '12345'): Crew
     {
         $crew = new Crew(
             key: CrewKey::fromString($key),
@@ -51,7 +51,7 @@ class RankingServiceTest extends TestCase
             partnerKey: null,
             mobile: '555-1234',
             socialPreference: true,
-            membershipNumber: '12345',
+            membershipNumber: $membershipNumber,
             skill: SkillLevel::INTERMEDIATE,
             experience: '5 years'
         );
@@ -198,8 +198,7 @@ class RankingServiceTest extends TestCase
     public function testUpdateCrewMembershipRankWithMember(): void
     {
         // Arrange
-        $crew = $this->createCrew('johndoe');
-        $crew->setMembershipNumber('12345');
+        $crew = $this->createCrew('johndoe', '12345');
 
         // Act
         $this->service->updateCrewMembershipRank($crew);
@@ -212,8 +211,7 @@ class RankingServiceTest extends TestCase
     public function testUpdateCrewMembershipRankWithoutMember(): void
     {
         // Arrange
-        $crew = $this->createCrew('johndoe');
-        $crew->setMembershipNumber(null);
+        $crew = $this->createCrew('johndoe', null);
 
         // Act
         $this->service->updateCrewMembershipRank($crew);

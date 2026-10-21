@@ -62,7 +62,7 @@ class SendCrewListUseCaseTest extends TestCase
         ];
     }
 
-    private function makeCrewedBoat(string $boatName, int $ownerUserId = 1, array $crews = []): array
+    private function makeCrewedBoat(string $boatName, ?string $ownerUserId = 'user-1', array $crews = []): array
     {
         return [
             'boat' => [
@@ -73,11 +73,10 @@ class SendCrewListUseCaseTest extends TestCase
         ];
     }
 
-    private function makeUser(int $id = 1, string $email = 'owner@example.com'): User
+    private function makeUser(string $id = 'user-1', string $email = 'owner@example.com'): User
     {
         $user = new User(
             email: $email,
-            passwordHash: 'hash',
             accountType: 'boat_owner',
             isAdmin: false
         );
@@ -127,7 +126,7 @@ class SendCrewListUseCaseTest extends TestCase
     public function testSkipsBoatWithNoOwnerUserId(): void
     {
         $eventId = EventId::fromString('Fri May 29');
-        $boat    = $this->makeCrewedBoat('Sailaway', 0);  // owner_user_id = 0 → no account
+        $boat    = $this->makeCrewedBoat('Sailaway', null);  // no owner user → no account
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->seasonRepository->method('getFlotilla')->willReturn($this->makeFlotilla([$boat]));
@@ -145,11 +144,11 @@ class SendCrewListUseCaseTest extends TestCase
     public function testSkipsOwnerWhenUserNotFound(): void
     {
         $eventId = EventId::fromString('Fri May 29');
-        $boat    = $this->makeCrewedBoat('Sailaway', 99);
+        $boat    = $this->makeCrewedBoat('Sailaway', 'user-99');
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->seasonRepository->method('getFlotilla')->willReturn($this->makeFlotilla([$boat]));
-        $this->userRepository->method('findById')->with(99)->willReturn(null);
+        $this->userRepository->method('findById')->with('user-99')->willReturn(null);
         $this->emailTemplateService->method('renderCrewListNotification')->willReturn('<html/>');
         $this->emailService->method('sendWithCc')->willReturn(true);
 
@@ -163,15 +162,15 @@ class SendCrewListUseCaseTest extends TestCase
     public function testSendsEmailWithCcToOwners(): void
     {
         $eventId = EventId::fromString('Fri May 29');
-        $boat1   = $this->makeCrewedBoat('Sailaway', 1);
-        $boat2   = $this->makeCrewedBoat('Windward', 2);
-        $user1   = $this->makeUser(1, 'owner1@example.com');
-        $user2   = $this->makeUser(2, 'owner2@example.com');
+        $boat1   = $this->makeCrewedBoat('Sailaway', 'user-1');
+        $boat2   = $this->makeCrewedBoat('Windward', 'user-2');
+        $user1   = $this->makeUser('user-1', 'owner1@example.com');
+        $user2   = $this->makeUser('user-2', 'owner2@example.com');
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->seasonRepository->method('getFlotilla')->willReturn($this->makeFlotilla([$boat1, $boat2]));
         $this->userRepository->method('findById')
-            ->willReturnMap([[1, $user1], [2, $user2]]);
+            ->willReturnMap([['user-1', $user1], ['user-2', $user2]]);
         $this->emailTemplateService->method('renderCrewListNotification')->willReturn('<html/>');
 
         $this->emailService->expects($this->once())
@@ -195,9 +194,9 @@ class SendCrewListUseCaseTest extends TestCase
     {
         $eventId = EventId::fromString('Fri May 29');
         // Same owner on two boats
-        $boat1 = $this->makeCrewedBoat('Boat A', 1);
-        $boat2 = $this->makeCrewedBoat('Boat B', 1);
-        $user  = $this->makeUser(1, 'owner@example.com');
+        $boat1 = $this->makeCrewedBoat('Boat A', 'user-1');
+        $boat2 = $this->makeCrewedBoat('Boat B', 'user-1');
+        $user  = $this->makeUser('user-1', 'owner@example.com');
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->seasonRepository->method('getFlotilla')->willReturn($this->makeFlotilla([$boat1, $boat2]));
@@ -217,8 +216,8 @@ class SendCrewListUseCaseTest extends TestCase
     public function testReturnsFalseWhenEmailFails(): void
     {
         $eventId = EventId::fromString('Fri May 29');
-        $boat    = $this->makeCrewedBoat('Sailaway', 1);
-        $user    = $this->makeUser(1, 'owner@example.com');
+        $boat    = $this->makeCrewedBoat('Sailaway', 'user-1');
+        $user    = $this->makeUser('user-1', 'owner@example.com');
 
         $this->eventRepository->method('findById')->willReturn($this->makeEventData());
         $this->seasonRepository->method('getFlotilla')->willReturn($this->makeFlotilla([$boat]));
