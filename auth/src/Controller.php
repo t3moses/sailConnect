@@ -227,7 +227,7 @@ final class Controller
             $seen[strtolower($to)] = true;
             $this->mailer->send($to, 'New registration: ' . $user['display_name'], $notice);
         }
-        $this->mailer->send($user['email_address'], 'Welcome to sailConnect', $this->view->partial('mail/registration_confirm', ['u' => $user, 'url' => $this->config->appUrl()]));
+        $this->mailer->send($user['email_address'], 'Welcome to Sail Connect', $this->view->partial('mail/registration_confirm', ['u' => $user, 'url' => $this->config->appUrl()]));
     }
 
     // ------------------------------------------------------------------ password reset
@@ -244,7 +244,7 @@ final class Controller
         if ($user && (int) $user['is_platform_active']) {
             $token = $this->tokens->issue($user['user_id'], 'password_reset', self::RESET_TTL);
             $url = $this->config->appUrl() . '/reset-password?token=' . $token;
-            $this->mailer->send($user['email_address'], 'Reset your sailConnect password', $this->view->partial('mail/reset', ['u' => $user, 'url' => $url]));
+            $this->mailer->send($user['email_address'], 'Reset your Sail Connect password', $this->view->partial('mail/reset', ['u' => $user, 'url' => $url]));
         }
         // Same response whether or not the account exists.
         $this->render('forgot', ['title' => 'Reset password', 'sent' => true, 'email' => $email]);
@@ -336,7 +336,7 @@ final class Controller
         }
         $token = $this->tokens->issue($this->user['user_id'], 'email_change', self::EMAIL_CHANGE_TTL, $new);
         $url = $this->config->appUrl() . '/confirm-email?token=' . $token;
-        $this->mailer->send($new, 'Confirm your new sailConnect email address', $this->view->partial('mail/email_change', ['u' => $this->user, 'url' => $url]));
+        $this->mailer->send($new, 'Confirm your new Sail Connect email address', $this->view->partial('mail/email_change', ['u' => $this->user, 'url' => $url]));
         $this->redirect('/profile?notice=email-sent');
     }
 
@@ -351,7 +351,7 @@ final class Controller
         $old = $this->users->find($row['user_id']);
         $this->users->setEmail($row['user_id'], $new);
         if ($old) {
-            $this->mailer->send($old['email_address'], 'Your sailConnect email address was changed', $this->view->partial('mail/email_changed_notice', ['u' => $old, 'new' => $new]));
+            $this->mailer->send($old['email_address'], 'Your Sail Connect email address was changed', $this->view->partial('mail/email_changed_notice', ['u' => $old, 'new' => $new]));
         }
         $this->render('message', ['title' => 'Email updated', 'heading' => 'Email address updated', 'message' => 'Your sign-in email address is now ' . $new . '.', 'link' => ['/profile', 'Back to profile']]);
     }

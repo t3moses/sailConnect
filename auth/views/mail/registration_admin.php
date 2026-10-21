@@ -1,5 +1,5 @@
 <?php use SailConnect\Auth\View; $e = [View::class, 'e']; ?>
-<p>A new user registered on sailConnect.</p>
+<p>A new user registered on Sail Connect.</p>
 <ul>
   <li>Name: <?= $e($u['first_name'] . ' ' . $u['last_name']) ?> (<?= $e($u['display_name']) ?>)</li>
   <li>Email: <?= $e($u['email_address']) ?></li>

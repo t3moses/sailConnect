@@ -31,7 +31,7 @@ class Mailer
                     $m->Password = $this->config->get('SMTP_PASSWORD');
                 }
             }
-            $m->setFrom($this->config->get('EMAIL_FROM', 'noreply@sailconnect.org'), $this->config->get('EMAIL_FROM_NAME', 'sailConnect'));
+            $m->setFrom($this->config->get('EMAIL_FROM', 'noreply@sailconnect.org'), $this->config->get('EMAIL_FROM_NAME', 'Sail Connect'));
             $m->addAddress($to);
             $m->Subject = $subject;
             $m->isHTML(true);
