@@ -11,7 +11,7 @@
 <body>
 <header>
   <div class="header-container">
-    <a href="/" class="logo"><img src="/assets/NSC_SC_logo.png" alt="Nepean Sailing Club"> sailConnect</a>
+    <a href="/" class="logo"><img src="/assets/NSC_SC_logo.png" alt="Nepean Sailing Club"> Sail Connect</a>
     <nav>
       <ul>
         <?php if (!empty($me)): ?>
