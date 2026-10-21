@@ -1,5 +1,5 @@
 <?php use SailConnect\Auth\View; $e = [View::class, 'e'];
-$notices = ['signed-out' => 'You have been signed out of all sailConnect applications.', 'password-reset' => 'Your password was changed. Please sign in.']; ?>
+$notices = ['signed-out' => 'You have been signed out of all Sail Connect applications.', 'password-reset' => 'Your password was changed. Please sign in.']; ?>
 <div class="card">
   <h2>Sign in</h2>
   <?php if (!empty($notices[$notice])): ?><p class="notice"><?= $e($notices[$notice]) ?></p><?php endif; ?>

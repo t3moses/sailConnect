@@ -25,7 +25,7 @@ final class View
     public function page(string $name, array $vars = []): string
     {
         $content = $this->partial($name, $vars);
-        return $this->partial('layout', $vars + ['content' => $content, 'title' => 'sailConnect']);
+        return $this->partial('layout', $vars + ['content' => $content, 'title' => 'Sail Connect']);
     }
 
     public static function e(?string $s): string

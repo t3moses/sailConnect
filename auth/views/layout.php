@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= $e($title) ?> - sailConnect</title>
+<title><?= $e($title) ?> - Sail Connect</title>
 <link rel="icon" href="/assets/knot-flat.png" type="image/png">
 <link rel="stylesheet" href="/css/auth.css">
 </head>
@@ -39,7 +39,7 @@
 
 <footer>
   <div class="footer-content">
-    <p><strong>Nepean Sailing Club &mdash; sailConnect</strong></p>
+    <p><strong>Nepean Sailing Club &mdash; Sail Connect</strong></p>
     <p><a href="https://nsc.ca">NSC Website</a></p>
     <p style="margin-top: 1rem; opacity: 0.7;">&copy; 2026 All Rights Reserved</p>
   </div>

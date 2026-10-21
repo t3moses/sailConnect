@@ -1,5 +1,5 @@
 <?php use SailConnect\Auth\View; $e = [View::class, 'e'];
-$notices = ['welcome' => 'Welcome to sailConnect! A confirmation was sent to your email address.', 'saved' => 'Profile saved.', 'password-saved' => 'Password changed. Other devices were signed out.', 'email-sent' => 'Confirmation link sent to the new address. Your email will change once you click it.'];
+$notices = ['welcome' => 'Welcome to Sail Connect! A confirmation was sent to your email address.', 'saved' => 'Profile saved.', 'password-saved' => 'Password changed. Other devices were signed out.', 'email-sent' => 'Confirmation link sent to the new address. Your email will change once you click it.'];
 $f = $v + ['first_name' => $u['first_name'], 'last_name' => $u['last_name'], 'is_member' => (bool) $u['is_member'], 'membership_number' => (string) $u['membership_number'], 'mobile_number' => (string) $u['mobile_number']]; ?>
 <?php if (!empty($notices[$notice])): ?><p class="notice"><?= $e($notices[$notice]) ?></p><?php endif; ?>
 <div class="card">
