@@ -1,6 +1,8 @@
 # Runbook: switch production sailFriday to sailConnect single sign-on
 
-Status: **planned, awaiting go-ahead; not yet run.** Prepared 2026-10-20 from a read-only inspection of the production server
+Status: **executed on 2026-10-21** (about 2 minutes of 503, 17:00 EDT). Platform admin: `t3moses@icloud.com` only. Cron jobs were deliberately not
+installed (season over; clock still in simulated mode). Old tree kept at `/var/www/sailFriday.old` until about 2026-10-28; pre-cutover database backups are in
+`~admin/backups/`. Prepared 2026-10-20 from a read-only inspection of the production server
 (`admin@16.54.93.63`). Revised 2026-10-21: sailFriday no longer stores email, password, names, mobile number or membership
 (see [SSO.md](SSO.md#how-sail-friday-reads-identity-data)), so auth is deployed with the new `mobile_number` column and the
 identity-move migration runs after the users are linked. Background: [SSO.md](SSO.md), [DEPLOYMENT.md](DEPLOYMENT.md#deploying-the-sailconnect-auth-service).
