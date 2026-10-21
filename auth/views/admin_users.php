@@ -2,9 +2,10 @@
 $notices = ['updated' => 'Updated.', 'last-admin' => 'There must always be at least one active platform admin.', 'cannot-deactivate-self' => 'You cannot deactivate your own account.', 'not-found' => 'User not found.']; ?>
 <?php if (!empty($notices[$notice])): ?><p class="notice <?= $notice === 'updated' ? '' : 'bad' ?>"><?= $e($notices[$notice]) ?></p><?php endif; ?>
 <div class="card">
-  <h1>Users (<?= count($users) ?>)</h1>
-  <div class="table-wrap"><table>
-    <tr><th>Name</th><th>Email</th><th>Member</th><th>Status</th><th>Admin</th><th>Registered</th></tr>
+  <h2>Users (<?= count($users) ?>)</h2>
+  <div class="table-wrap"><table class="data-table">
+    <thead><tr><th>Name</th><th>Email</th><th>Member</th><th>Status</th><th>Admin</th><th>Registered</th></tr></thead>
+    <tbody>
     <?php foreach ($users as $x): $self = $x['user_id'] === $meId; ?>
     <tr>
       <td><?= $e($x['first_name'] . ' ' . $x['last_name']) ?><br><span class="tag"><?= $e($x['display_name']) ?></span></td>
@@ -27,5 +28,6 @@ $notices = ['updated' => 'Updated.', 'last-admin' => 'There must always be at le
       <td><?= $e(substr($x['created_at'], 0, 10)) ?></td>
     </tr>
     <?php endforeach; ?>
+    </tbody>
   </table></div>
 </div>

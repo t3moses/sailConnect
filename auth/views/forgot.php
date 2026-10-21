@@ -1,6 +1,6 @@
 <?php use SailConnect\Auth\View; $e = [View::class, 'e']; ?>
 <div class="card">
-  <h1>Reset your password</h1>
+  <h2>Reset your password</h2>
   <?php if ($sent): ?>
     <p class="notice">If an account exists for that address, a reset link is on its way. It expires in one hour.</p>
   <?php else: ?>

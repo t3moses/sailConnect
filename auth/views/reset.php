@@ -1,6 +1,6 @@
 <?php use SailConnect\Auth\View; $e = [View::class, 'e']; ?>
 <div class="card">
-  <h1>Choose a new password</h1>
+  <h2>Choose a new password</h2>
   <form method="post" action="/reset-password">
     <input type="hidden" name="csrf" value="<?= $e($csrf) ?>">
     <input type="hidden" name="token" value="<?= $e($token) ?>">

@@ -16,8 +16,13 @@ error_reporting($debug ? E_ALL : E_ALL & ~E_DEPRECATED);
 $path = rtrim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/', '/') ?: '/';
 
 // Static assets (used by the PHP built-in server; the web server serves them directly in production).
-if (str_starts_with($path, '/css/') && is_file(__DIR__ . $path) && !str_contains($path, '..')) {
-    header('Content-Type: text/css');
+$staticTypes = ['css' => 'text/css', 'png' => 'image/png', 'svg' => 'image/svg+xml'];
+$extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+if (
+    (str_starts_with($path, '/css/') || str_starts_with($path, '/assets/'))
+    && isset($staticTypes[$extension]) && is_file(__DIR__ . $path) && !str_contains($path, '..')
+) {
+    header('Content-Type: ' . $staticTypes[$extension]);
     readfile(__DIR__ . $path);
     return;
 }

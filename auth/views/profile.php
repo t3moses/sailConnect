@@ -3,7 +3,7 @@ $notices = ['welcome' => 'Welcome to sailConnect! A confirmation was sent to you
 $f = $v + ['first_name' => $u['first_name'], 'last_name' => $u['last_name'], 'is_member' => (bool) $u['is_member'], 'membership_number' => (string) $u['membership_number'], 'mobile_number' => (string) $u['mobile_number']]; ?>
 <?php if (!empty($notices[$notice])): ?><p class="notice"><?= $e($notices[$notice]) ?></p><?php endif; ?>
 <div class="card">
-  <h1>Your profile</h1>
+  <h2>Your profile</h2>
   <p class="hint">Display name: <strong><?= $e($u['display_name']) ?></strong> · <?= $e($u['email_address']) ?></p>
   <form method="post" action="/profile">
     <input type="hidden" name="csrf" value="<?= $e($csrf) ?>">

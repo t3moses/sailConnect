@@ -1,6 +1,6 @@
 <?php use SailConnect\Auth\View; $e = [View::class, 'e']; $v += ['email_address' => '', 'email_confirm' => '', 'first_name' => '', 'last_name' => '', 'is_member' => false, 'membership_number' => '', 'mobile_number' => '']; ?>
 <div class="card">
-  <h1>Create your account</h1>
+  <h2>Create your account</h2>
   <p class="hint">One account works across all sailConnect applications.</p>
   <form method="post" action="/register<?= $return !== '' ? '?return=' . $e(urlencode($return)) : '' ?>">
     <input type="hidden" name="csrf" value="<?= $e($csrf) ?>">
