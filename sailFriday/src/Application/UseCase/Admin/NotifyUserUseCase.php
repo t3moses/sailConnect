@@ -26,14 +26,14 @@ class NotifyUserUseCase
     }
 
     /**
-     * @param int    $targetUserId ID of the user to notify
+     * @param string    $targetUserId ID of the user to notify
      * @param string $subject      Email subject
      * @param string $message      Plain-text message body
      * @return array{emails_sent: int, message: string}
      * @throws ValidationException If subject or message is empty
      * @throws \RuntimeException   If the target user is not found
      */
-    public function execute(int $targetUserId, string $subject, string $message): array
+    public function execute(string $targetUserId, string $subject, string $message): array
     {
         $errors = [];
         if (trim($subject) === '') {

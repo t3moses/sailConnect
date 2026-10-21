@@ -20,7 +20,7 @@ use App\Domain\Enum\SkillLevel;
 class Crew
 {
     private ?int $id = null;
-    private ?int $userId = null;
+    private ?string $userId = null;
     private Rank $rank;
 
     /** @var array<string, AvailabilityStatus> Availability per event (event_id => status) */
@@ -72,12 +72,12 @@ class Crew
         $this->id = $id;
     }
 
-    public function getUserId(): ?int
+    public function getUserId(): ?string
     {
         return $this->userId;
     }
 
-    public function setUserId(?int $userId): void
+    public function setUserId(?string $userId): void
     {
         $this->userId = $userId;
     }
@@ -104,19 +104,9 @@ class Crew
         return $this->firstName;
     }
 
-    public function setFirstName(string $firstName): void
-    {
-        $this->firstName = $firstName;
-    }
-
     public function getLastName(): string
     {
         return $this->lastName;
-    }
-
-    public function setLastName(string $lastName): void
-    {
-        $this->lastName = $lastName;
     }
 
     // === Partner ===
@@ -141,11 +131,6 @@ class Crew
     public function getMobile(): ?string
     {
         return $this->mobile;
-    }
-
-    public function setMobile(?string $mobile): void
-    {
-        $this->mobile = $mobile;
     }
 
     // === Preferences ===
@@ -177,16 +162,6 @@ class Crew
     public function getMembershipNumber(): ?string
     {
         return $this->membershipNumber;
-    }
-
-    public function setMembershipNumber(?string $membershipNumber): void
-    {
-        $this->membershipNumber = $membershipNumber;
-        // Update rank when membership changes
-        $this->setRankDimension(
-            CrewRankDimension::MEMBERSHIP,
-            self::calculateMembershipRank($membershipNumber)
-        );
     }
 
     public function isMember(): bool

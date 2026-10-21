@@ -32,7 +32,7 @@ class CrewRepository implements CrewRepositoryInterface
     public function findByKey(CrewKey $key): ?Crew
     {
         $stmt = $this->pdo->prepare('
-            SELECT * FROM crews WHERE key = :key LIMIT 1
+            SELECT * FROM crews_full WHERE key = :key LIMIT 1
         ');
         $stmt->execute(['key' => $key->toString()]);
         $row = $stmt->fetch();
@@ -47,7 +47,7 @@ class CrewRepository implements CrewRepositoryInterface
     public function findByName(string $firstName, string $lastName): ?Crew
     {
         $stmt = $this->pdo->prepare('
-            SELECT * FROM crews
+            SELECT * FROM crews_full
             WHERE first_name = :first_name
             AND last_name = :last_name
             LIMIT 1
@@ -65,10 +65,10 @@ class CrewRepository implements CrewRepositoryInterface
         return $this->hydrate($row);
     }
 
-    public function findByUserId(int $userId): ?Crew
+    public function findByUserId(string $userId): ?Crew
     {
         $stmt = $this->pdo->prepare('
-            SELECT * FROM crews WHERE user_id = :user_id LIMIT 1
+            SELECT * FROM crews_full WHERE user_id = :user_id LIMIT 1
         ');
         $stmt->execute(['user_id' => $userId]);
         $row = $stmt->fetch();
@@ -82,7 +82,7 @@ class CrewRepository implements CrewRepositoryInterface
 
     public function findAll(): array
     {
-        $stmt = $this->pdo->query('SELECT * FROM crews ORDER BY display_name');
+        $stmt = $this->pdo->query('SELECT * FROM crews_full ORDER BY display_name');
         $rows = $stmt->fetchAll();
 
         if (empty($rows)) {
@@ -113,7 +113,7 @@ class CrewRepository implements CrewRepositoryInterface
     public function findAvailableForEvent(EventId $eventId): array
     {
         $stmt = $this->pdo->prepare('
-            SELECT c.* FROM crews c
+            SELECT c.* FROM crews_full c
             INNER JOIN crew_availability ca ON c.id = ca.crew_id
             WHERE ca.event_id = :event_id
             ORDER BY c.display_name
@@ -127,7 +127,7 @@ class CrewRepository implements CrewRepositoryInterface
     public function findAssignedToEvent(EventId $eventId): array
     {
         $stmt = $this->pdo->prepare('
-            SELECT c.* FROM crews c
+            SELECT c.* FROM crews_full c
             INNER JOIN crew_availability ca ON c.id = ca.crew_id
             WHERE ca.event_id = :event_id
             ORDER BY c.display_name
@@ -392,14 +392,12 @@ class CrewRepository implements CrewRepositoryInterface
     {
         $stmt = $this->pdo->prepare('
             INSERT INTO crews (
-                key, display_name, first_name, last_name, partner_key,
-                mobile, social_preference, membership_number,
+                key, display_name, partner_key, social_preference,
                 skill, experience, active,
                 commitment_rank, membership_rank, absence_rank, initial_commitment_rank,
                 user_id
             ) VALUES (
-                :key, :display_name, :first_name, :last_name, :partner_key,
-                :mobile, :social_preference, :membership_number,
+                :key, :display_name, :partner_key, :social_preference,
                 :skill, :experience, :active,
                 :commitment_rank, :membership_rank, :absence_rank, :initial_commitment_rank,
                 :user_id
@@ -410,12 +408,8 @@ class CrewRepository implements CrewRepositoryInterface
         $stmt->execute([
             'key' => $crew->getKey()->toString(),
             'display_name' => $crew->getDisplayName(),
-            'first_name' => $crew->getFirstName(),
-            'last_name' => $crew->getLastName(),
             'partner_key' => $crew->getPartnerKey()?->toString(),
-            'mobile' => $crew->getMobile(),
             'social_preference' => $crew->hasSocialPreference() ? 'Yes' : 'No',
-            'membership_number' => $crew->getMembershipNumber(),
             'skill' => $crew->getSkill()->value,
             'experience' => $crew->getExperience(),
             'active' => $crew->isActive() ? 1 : 0,
@@ -440,12 +434,8 @@ class CrewRepository implements CrewRepositoryInterface
         $stmt = $this->pdo->prepare('
             UPDATE crews SET
                 display_name = :display_name,
-                first_name = :first_name,
-                last_name = :last_name,
                 partner_key = :partner_key,
-                mobile = :mobile,
                 social_preference = :social_preference,
-                membership_number = :membership_number,
                 skill = :skill,
                 experience = :experience,
                 active = :active,
@@ -460,12 +450,8 @@ class CrewRepository implements CrewRepositoryInterface
         $stmt->execute([
             'id' => $crew->getId(),
             'display_name' => $crew->getDisplayName(),
-            'first_name' => $crew->getFirstName(),
-            'last_name' => $crew->getLastName(),
             'partner_key' => $crew->getPartnerKey()?->toString(),
-            'mobile' => $crew->getMobile(),
             'social_preference' => $crew->hasSocialPreference() ? 'Yes' : 'No',
-            'membership_number' => $crew->getMembershipNumber(),
             'skill' => $crew->getSkill()->value,
             'experience' => $crew->getExperience(),
             'active' => $crew->isActive() ? 1 : 0,
@@ -567,13 +553,13 @@ class CrewRepository implements CrewRepositoryInterface
 
         // Set user_id if present
         if (isset($row['user_id']) && $row['user_id'] !== null) {
-            $crew->setUserId((int)$row['user_id']);
+            $crew->setUserId((string)$row['user_id']);
         }
 
         $rank = Rank::forCrew(
             availability: 0, // Database loads don't set availability (event-specific)
             commitment: (int)$row['commitment_rank'],
-            membership: (int)$row['membership_rank'],
+            membership: Crew::calculateMembershipRank(!empty($row['membership_number']) ? $row['membership_number'] : null),
             absence: (int)$row['absence_rank']
         );
         $crew->setRank($rank);
@@ -769,13 +755,13 @@ class CrewRepository implements CrewRepositoryInterface
 
         // Set user_id if present
         if (isset($row['user_id']) && $row['user_id'] !== null) {
-            $crew->setUserId((int)$row['user_id']);
+            $crew->setUserId((string)$row['user_id']);
         }
 
         $rank = Rank::forCrew(
             availability: 0, // Database loads don't set availability (event-specific)
             commitment: (int)$row['commitment_rank'],
-            membership: (int)$row['membership_rank'],
+            membership: Crew::calculateMembershipRank(!empty($row['membership_number']) ? $row['membership_number'] : null),
             absence: (int)$row['absence_rank']
         );
         $crew->setRank($rank);

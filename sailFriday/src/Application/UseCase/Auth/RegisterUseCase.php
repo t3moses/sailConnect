@@ -30,8 +30,8 @@ use App\Domain\Enum\SkillLevel;
  * Register Use Case
  *
  * Enrolls a signed-in sailConnect user in Sail Friday as a crew member or boat owner.
- * Credentials, names and membership come from the sailConnect identity (auth service); this
- * creates the local user record linked to it plus the crew or boat profile, in one transaction.
+ * Credentials, names, mobile number and membership come from the sailConnect identity (auth service);
+ * this creates the local user record linked to it plus the crew or boat profile, in one transaction.
  */
 class RegisterUseCase
 {
@@ -55,7 +55,7 @@ class RegisterUseCase
      *
      * @param RegisterRequest $request Registration request (account type and profile)
      * @param array $identity Signed-in sailConnect identity (user_id, email_address, first_name,
-     *                        last_name, is_member, membership_number)
+     *                        last_name, mobile_number, is_member, membership_number)
      * @return UserResponse The new Sail Friday user
      * @throws ValidationException If validation fails
      * @throws UserAlreadyExistsException If the identity is already enrolled or the email is taken
@@ -69,21 +69,21 @@ class RegisterUseCase
         }
 
         $email = strtolower((string)$identity['email_address']);
-        $alreadyEnrolled = $this->userRepository->findByAuthUserId((string)$identity['user_id']) !== null;
+        $alreadyEnrolled = $this->userRepository->findById((string)$identity['user_id']) !== null;
         if ($alreadyEnrolled || $this->userRepository->emailExists($email)) {
             throw new UserAlreadyExistsException($email);
         }
 
-        // Names and membership are owned by sailConnect and always override the submitted profile
+        // Names, mobile and membership are owned by sailConnect and always override the submitted profile
         $request = $request->withIdentity($identity);
+        $this->requireMobileWhereNeeded($request);
 
-        // Credentials live in sailConnect; the local hash column is unused
+        // Email and credentials live in sailConnect; only the link to the identity is stored here
         $user = new User(
             email: $email,
-            passwordHash: '',
             accountType: $request->accountType,
             isAdmin: false,
-            authUserId: (string)$identity['user_id'],
+            id: (string)$identity['user_id'],
         );
 
         // Begin transaction to ensure atomic creation of user and profile
@@ -120,6 +120,25 @@ class RegisterUseCase
         $this->sendWelcomeEmail($user, $resolvedDisplayName);
 
         return UserResponse::fromEntity($user);
+    }
+
+    /**
+     * Boat owners are added to the Sail Friday network by phone, and so are crew who ask to join the
+     * WhatsApp group. The number comes from the sailConnect profile, so say where to add it.
+     *
+     * @throws ValidationException
+     */
+    private function requireMobileWhereNeeded(RegisterRequest $request): void
+    {
+        $profile = $request->profile ?? [];
+        $message = 'Add your mobile number to your sailConnect profile, then try again';
+
+        if ($request->accountType === 'boat_owner' && empty($profile['ownerMobile'])) {
+            throw new ValidationException(['profile.ownerMobile' => $message]);
+        }
+        if ($request->accountType === 'crew' && $this->parseYesNo($profile['socialPreference'] ?? null) && empty($profile['mobile'])) {
+            throw new ValidationException(['profile.mobile' => $message]);
+        }
     }
 
     private function parseYesNo(mixed $value): bool

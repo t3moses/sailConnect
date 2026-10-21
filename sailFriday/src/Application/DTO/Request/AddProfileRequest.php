@@ -34,7 +34,34 @@ final readonly class AddProfileRequest
     }
 
     /**
+     * Copy with names, mobile number and membership taken from the sailConnect identity
+     *
+     * @param array $identity first_name, last_name, mobile_number, is_member, membership_number
+     * @return self
+     */
+    public function withIdentity(array $identity): self
+    {
+        $crew = $this->crewProfile;
+        $boat = $this->boatProfile;
+        if (is_array($crew)) {
+            $crew['firstName'] = $identity['first_name'];
+            $crew['lastName'] = $identity['last_name'];
+            $crew['mobile'] = $identity['mobile_number'] ?? null;
+            $crew['membershipNumber'] = !empty($identity['is_member']) ? $identity['membership_number'] : null;
+        }
+        if (is_array($boat)) {
+            $boat['ownerFirstName'] = $identity['first_name'];
+            $boat['ownerLastName'] = $identity['last_name'];
+            $boat['ownerMobile'] = $identity['mobile_number'] ?? null;
+        }
+
+        return new self($this->profileType, $crew, $boat);
+    }
+
+    /**
      * Validate the request
+     *
+     * Names, mobile number and membership are not validated here: they come from the sailConnect identity.
      *
      * @return array Validation errors (empty if valid)
      */
@@ -77,15 +104,7 @@ final readonly class AddProfileRequest
     {
         $errors = [];
 
-        if (empty($profile['firstName'])) {
-            $errors['crewProfile.firstName'] = 'First name is required';
-        }
-
-        if (empty($profile['lastName'])) {
-            $errors['crewProfile.lastName'] = 'Last name is required';
-        }
-
-        // Optional fields: displayName, mobile, skill, membershipNumber, socialPreference, experience, partnerKey
+        // Optional fields: displayName, skill, socialPreference, experience, partnerKey
 
         return $errors;
     }
@@ -99,14 +118,6 @@ final readonly class AddProfileRequest
     private function validateBoatProfile(array $profile): array
     {
         $errors = [];
-
-        if (empty($profile['ownerFirstName'])) {
-            $errors['boatProfile.ownerFirstName'] = 'Owner first name is required';
-        }
-
-        if (empty($profile['ownerLastName'])) {
-            $errors['boatProfile.ownerLastName'] = 'Owner last name is required';
-        }
 
         if (!isset($profile['minBerths']) || !is_numeric($profile['minBerths'])) {
             $errors['boatProfile.minBerths'] = 'Minimum berths is required and must be a number';

@@ -39,18 +39,23 @@ class AddProfileUseCase
     /**
      * Execute add profile
      *
-     * @param int $userId User ID
+     * @param string $userId User ID
      * @param AddProfileRequest $request Add profile request
+     * @param array $identity Signed-in sailConnect identity (first_name, last_name, mobile_number,
+     *                        is_member, membership_number)
      * @return ProfileResponse Updated profile with new crew or boat
      * @throws ValidationException If validation fails or profile already exists
      */
-    public function execute(int $userId, AddProfileRequest $request): ProfileResponse
+    public function execute(string $userId, AddProfileRequest $request, array $identity): ProfileResponse
     {
         // Validate request
         $errors = $request->validate();
         if (!empty($errors)) {
             throw new ValidationException($errors);
         }
+
+        // Names, mobile and membership are owned by sailConnect and override anything submitted
+        $request = $request->withIdentity($identity);
 
         // Get user
         $user = $this->userRepository->findById($userId);
@@ -99,12 +104,12 @@ class AddProfileUseCase
     /**
      * Add crew profile
      *
-     * @param int $userId User ID
+     * @param string $userId User ID
      * @param array $profile Crew profile data
      * @return void
      * @throws ValidationException If user already has crew profile
      */
-    private function addCrewProfile(int $userId, array $profile): void
+    private function addCrewProfile(string $userId, array $profile): void
     {
         // Check if user already has crew profile
         $existingCrew = $this->crewRepository->findByUserId($userId);
@@ -162,12 +167,12 @@ class AddProfileUseCase
     /**
      * Add boat profile
      *
-     * @param int $userId User ID
+     * @param string $userId User ID
      * @param array $profile Boat profile data
      * @return void
      * @throws ValidationException If user already has boat profile
      */
-    private function addBoatProfile(int $userId, array $profile): void
+    private function addBoatProfile(string $userId, array $profile): void
     {
         // Check if user already has boat profile
         $existingBoat = $this->boatRepository->findByOwnerUserId($userId);

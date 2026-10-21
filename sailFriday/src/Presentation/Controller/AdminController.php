@@ -282,9 +282,9 @@ class AdminController
         }
 
         try {
-            $targetUserId = (int)$params['userId'];
+            $targetUserId = (string)$params['userId'];
             $isAdmin = (bool)($body['is_admin'] ?? false);
-            $requestingUserId = (int)$auth['user_id'];
+            $requestingUserId = (string)$auth['user_id'];
 
             $result = $this->setUserAdminUseCase->execute($targetUserId, $isAdmin, $requestingUserId);
 
@@ -313,7 +313,7 @@ class AdminController
         }
 
         try {
-            $userId = (int)$params['userId'];
+            $userId = (string)$params['userId'];
             $result = $this->getUserDetailUseCase->execute($userId);
 
             return JsonResponse::success($result);
@@ -342,8 +342,8 @@ class AdminController
         }
 
         try {
-            $targetUserId = (int)$params['userId'];
-            $requestingUserId = (int)$auth['user_id'];
+            $targetUserId = (string)$params['userId'];
+            $requestingUserId = (string)$auth['user_id'];
 
             $result = $this->deactivateUserUseCase->execute($targetUserId, $requestingUserId);
 
@@ -373,7 +373,7 @@ class AdminController
         }
 
         try {
-            $targetUserId = (int)$params['userId'];
+            $targetUserId = (string)$params['userId'];
             $subject      = (string)($body['subject'] ?? '');
             $message      = (string)($body['message'] ?? '');
 

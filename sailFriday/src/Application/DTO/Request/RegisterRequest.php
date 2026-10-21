@@ -33,9 +33,11 @@ final readonly class RegisterRequest
     }
 
     /**
-     * Copy with names and membership taken from the sailConnect identity
+     * Copy with names, mobile number and membership taken from the sailConnect identity
      *
-     * @param array $identity first_name, last_name, is_member, membership_number
+     * These are never accepted from the request body and never stored by Sail Friday.
+     *
+     * @param array $identity first_name, last_name, mobile_number, is_member, membership_number
      * @return self
      */
     public function withIdentity(array $identity): self
@@ -45,9 +47,11 @@ final readonly class RegisterRequest
             $profile['firstName'] = $identity['first_name'];
             $profile['lastName'] = $identity['last_name'];
             $profile['membershipNumber'] = !empty($identity['is_member']) ? $identity['membership_number'] : null;
+            $profile['mobile'] = $identity['mobile_number'] ?? null;
         } else {
             $profile['ownerFirstName'] = $identity['first_name'];
             $profile['ownerLastName'] = $identity['last_name'];
+            $profile['ownerMobile'] = $identity['mobile_number'] ?? null;
         }
 
         return new self($this->accountType, $profile);
@@ -56,7 +60,7 @@ final readonly class RegisterRequest
     /**
      * Validate the request
      *
-     * Names and membership are not validated here: they come from the sailConnect identity.
+     * Names, mobile number and membership are not validated here: they come from the sailConnect identity.
      *
      * @return array Validation errors (empty if valid)
      */
@@ -107,7 +111,7 @@ final readonly class RegisterRequest
             $errors['profile.maxBerths'] = 'Maximum berths cannot be less than minimum berths';
         }
 
-        // Optional fields: ownerMobile, assistanceRequired, socialPreference
+        // Optional fields: assistanceRequired, socialPreference
 
         return $errors;
     }

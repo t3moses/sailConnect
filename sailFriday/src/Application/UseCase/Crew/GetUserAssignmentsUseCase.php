@@ -33,10 +33,10 @@ class GetUserAssignmentsUseCase
     /**
      * Execute the use case
      *
-     * @param int $userId
+     * @param string $userId
      * @return array<AssignmentResponse>
      */
-    public function execute(int $userId): array
+    public function execute(string $userId): array
     {
         // Check if user is a crew member and/or boat owner
         $crew = $this->crewRepository->findByUserId($userId);

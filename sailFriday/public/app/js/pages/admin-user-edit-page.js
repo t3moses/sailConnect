@@ -39,8 +39,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Extract userId from query string
     const params = new URLSearchParams(window.location.search);
-    targetUserId = parseInt(params.get('userId'), 10);
-    if (!targetUserId || isNaN(targetUserId)) {
+    targetUserId = params.get('userId');
+    if (!targetUserId) {
         showPageError('No user ID provided. Please go back to the user list.');
         return;
     }

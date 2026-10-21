@@ -128,7 +128,7 @@ export async function getAllUsers() {
 
 /**
  * Grant or revoke admin privileges for a user
- * @param {number} userId - Target user ID
+ * @param {string} userId - Target user ID (the sailConnect user ID)
  * @param {boolean} isAdmin - Whether to grant (true) or revoke (false) admin
  * @returns {Promise<Object>} Updated user summary
  */
@@ -149,7 +149,7 @@ export async function setUserAdmin(userId, isAdmin) {
 
 /**
  * Get a single user's detail including linked crew profile
- * @param {number} userId - Target user ID
+ * @param {string} userId - Target user ID (the sailConnect user ID)
  * @returns {Promise<{user: Object, crew: Object|null}>}
  */
 export async function getUserDetail(userId) {
@@ -171,7 +171,7 @@ export async function getUserDetail(userId) {
  * Deactivate a user's linked crew account: withdraw them from future events,
  * mark the crew inactive, and set commitment_rank to 0. The account itself is
  * kept (the email address stays claimed).
- * @param {number} userId - Target user ID
+ * @param {string} userId - Target user ID (the sailConnect user ID)
  * @returns {Promise<Object>} { deactivated: true, user_id: number, crew_key: string, withdrawn_from_future_events: boolean }
  */
 export async function deactivateUser(userId) {
@@ -191,7 +191,7 @@ export async function deactivateUser(userId) {
 
 /**
  * Send an admin-composed notification email to a single user.
- * @param {number} userId - Target user ID
+ * @param {string} userId - Target user ID (the sailConnect user ID)
  * @param {{subject: string, message: string}} options
  * @returns {Promise<{emails_sent: number, message: string}>}
  */

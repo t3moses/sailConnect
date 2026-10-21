@@ -20,7 +20,7 @@ use Psr\Log\LoggerInterface;
 /**
  * Update User Profile Use Case
  *
- * Updates crew/boat profiles. Email, password, names and membership are owned by sailConnect.
+ * Updates crew/boat profiles. Email, password, names, mobile number and membership are owned by sailConnect.
  */
 class UpdateUserProfileUseCase
 {
@@ -40,12 +40,12 @@ class UpdateUserProfileUseCase
     /**
      * Execute update user profile
      *
-     * @param int $userId User ID
+     * @param string $userId User ID
      * @param UpdateProfileRequest $request Update request
      * @return ProfileResponse Updated profile
      * @throws ValidationException If validation fails
      */
-    public function execute(int $userId, UpdateProfileRequest $request): ProfileResponse
+    public function execute(string $userId, UpdateProfileRequest $request): ProfileResponse
     {
         // Validate request
         $errors = $request->validate();
@@ -186,11 +186,11 @@ class UpdateUserProfileUseCase
     /**
      * Update crew profile
      *
-     * @param int $userId User ID
+     * @param string $userId User ID
      * @param array $profile Crew profile updates
      * @return Crew Updated crew entity
      */
-    private function updateCrewProfile(int $userId, array $profile): Crew
+    private function updateCrewProfile(string $userId, array $profile): Crew
     {
         $crew = $this->crewRepository->findByUserId($userId);
         if ($crew === null) {
@@ -201,12 +201,9 @@ class UpdateUserProfileUseCase
         $originalRank = $crew->getRank();
 
         // Update allowed fields
-        // firstName, lastName and membershipNumber are owned by sailConnect and are not updated here
+        // firstName, lastName, mobile and membershipNumber are owned by sailConnect and are not updated here
         if (isset($profile['displayName'])) {
             $crew->setDisplayName($profile['displayName']);
-        }
-        if (isset($profile['mobile'])) {
-            $crew->setMobile($profile['mobile']);
         }
         if (isset($profile['skill'])) {
             $crew->setSkill(\App\Domain\Enum\SkillLevel::from((int)$profile['skill']));
@@ -234,11 +231,11 @@ class UpdateUserProfileUseCase
     /**
      * Update boat profile
      *
-     * @param int $userId User ID
+     * @param string $userId User ID
      * @param array $profile Boat profile updates
      * @return Boat Updated boat entity
      */
-    private function updateBoatProfile(int $userId, array $profile): Boat
+    private function updateBoatProfile(string $userId, array $profile): Boat
     {
         $boat = $this->boatRepository->findByOwnerUserId($userId);
         if ($boat === null) {
@@ -249,12 +246,9 @@ class UpdateUserProfileUseCase
         $originalRank = $boat->getRank();
 
         // Update allowed fields
-        // ownerFirstName and ownerLastName are owned by sailConnect and are not updated here
+        // ownerFirstName, ownerLastName and ownerMobile are owned by sailConnect and are not updated here
         if (isset($profile['displayName'])) {
             $boat->setDisplayName($profile['displayName']);
-        }
-        if (isset($profile['ownerMobile'])) {
-            $boat->setOwnerMobile($profile['ownerMobile']);
         }
         if (isset($profile['minBerths'])) {
             $boat->setMinBerths((int)$profile['minBerths']);

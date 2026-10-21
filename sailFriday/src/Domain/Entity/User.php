@@ -7,27 +7,27 @@ namespace App\Domain\Entity;
 /**
  * User Entity
  *
- * Represents a user account in the system with authentication credentials.
+ * Represents a Sail Friday account for a sailConnect identity (auth service). Its ID is the sailConnect user ID.
  * Users can be crew members, boat owners, or both (via separate profile records).
  *
+ * The email address is owned by sailConnect and is read through, never stored here; credentials
+ * are not known to Sail Friday at all.
+ *
  * Note: This entity is separate from Crew and Boat entities.
- * A user authenticates with email/password, then links to crew/boat profiles.
  */
 class User
 {
-    private ?int $id = null;
+    private ?string $id;
 
     public function __construct(
         private string $email,
-        private string $passwordHash,
         private string $accountType,
         private bool $isAdmin = false,
-        private ?\DateTimeImmutable $lastLogin = null,
-        private ?\DateTimeImmutable $lastLogout = null,
         private ?\DateTimeImmutable $createdAt = null,
         private ?\DateTimeImmutable $updatedAt = null,
-        private ?string $authUserId = null,
+        ?string $id = null,
     ) {
+        $this->id = $id;
         $this->validateEmail($email);
         $this->validateAccountType($accountType);
 
@@ -42,7 +42,7 @@ class User
     /**
      * Get user ID
      */
-    public function getId(): ?int
+    public function getId(): ?string
     {
         return $this->id;
     }
@@ -50,7 +50,7 @@ class User
     /**
      * Set user ID (called by repository after insert)
      */
-    public function setId(int $id): void
+    public function setId(string $id): void
     {
         if ($this->id !== null) {
             throw new \RuntimeException('User ID is already set');
@@ -59,57 +59,11 @@ class User
     }
 
     /**
-     * Get the sailConnect (auth service) user ID this account is linked to
-     */
-    public function getAuthUserId(): ?string
-    {
-        return $this->authUserId;
-    }
-
-    /**
-     * Link this account to a sailConnect identity
-     */
-    public function setAuthUserId(?string $authUserId): void
-    {
-        $this->authUserId = $authUserId;
-    }
-
-    /**
-     * Get email address
+     * Get email address (from the sailConnect identity)
      */
     public function getEmail(): string
     {
         return $this->email;
-    }
-
-    /**
-     * Set email address
-     */
-    public function setEmail(string $email): void
-    {
-        $this->validateEmail($email);
-        $this->email = $email;
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-
-    /**
-     * Get password hash
-     */
-    public function getPasswordHash(): string
-    {
-        return $this->passwordHash;
-    }
-
-    /**
-     * Set password hash
-     */
-    public function setPasswordHash(string $passwordHash): void
-    {
-        if (empty($passwordHash)) {
-            throw new \InvalidArgumentException('Password hash cannot be empty');
-        }
-        $this->passwordHash = $passwordHash;
-        $this->updatedAt = new \DateTimeImmutable();
     }
 
     /**
@@ -164,40 +118,6 @@ class User
     }
 
     /**
-     * Get last login timestamp
-     */
-    public function getLastLogin(): ?\DateTimeImmutable
-    {
-        return $this->lastLogin;
-    }
-
-    /**
-     * Update last login timestamp
-     */
-    public function updateLastLogin(\DateTimeImmutable $time): void
-    {
-        $this->lastLogin = $time;
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-
-    /**
-     * Get last logout timestamp
-     */
-    public function getLastLogout(): ?\DateTimeImmutable
-    {
-        return $this->lastLogout;
-    }
-
-    /**
-     * Update last logout timestamp
-     */
-    public function updateLastLogout(\DateTimeImmutable $time): void
-    {
-        $this->lastLogout = $time;
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-
-    /**
      * Get created at timestamp
      */
     public function getCreatedAt(): \DateTimeImmutable
@@ -223,8 +143,6 @@ class User
             'email' => $this->email,
             'account_type' => $this->accountType,
             'is_admin' => $this->isAdmin,
-            'last_login' => $this->lastLogin?->format('Y-m-d H:i:s'),
-            'last_logout' => $this->lastLogout?->format('Y-m-d H:i:s'),
             'created_at' => $this->createdAt->format('Y-m-d H:i:s'),
             'updated_at' => $this->updatedAt->format('Y-m-d H:i:s'),
         ];

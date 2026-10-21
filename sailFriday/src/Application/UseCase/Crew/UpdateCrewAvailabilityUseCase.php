@@ -38,7 +38,7 @@ class UpdateCrewAvailabilityUseCase
     /**
      * Execute the use case
      *
-     * @param int $userId
+     * @param string $userId
      * @param UpdateAvailabilityRequest $request
      * @return CrewResponse
      * @throws ValidationException
@@ -46,7 +46,7 @@ class UpdateCrewAvailabilityUseCase
      * @throws CrewInactiveException
      * @throws EventNotFoundException
      */
-    public function execute(int $userId, UpdateAvailabilityRequest $request): CrewResponse
+    public function execute(string $userId, UpdateAvailabilityRequest $request): CrewResponse
     {
         // Check blackout window — only active when an event is scheduled today
         $config = $this->seasonRepository->getConfig();

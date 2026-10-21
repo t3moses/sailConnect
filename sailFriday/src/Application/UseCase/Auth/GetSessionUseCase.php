@@ -22,11 +22,11 @@ class GetSessionUseCase
     /**
      * Execute get session
      *
-     * @param int $userId User ID from JWT token
+     * @param string $userId User ID from JWT token
      * @return UserResponse User information
      * @throws \RuntimeException If user not found
      */
-    public function execute(int $userId): UserResponse
+    public function execute(string $userId): UserResponse
     {
         $user = $this->userRepository->findById($userId);
 

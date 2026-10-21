@@ -44,7 +44,7 @@ class UpdateAssignedCrewSkillUseCase
      * @throws CrewNotFoundException
      * @throws ValidationException
      */
-    public function execute(int $userId, string $eventIdString, string $crewKeyString, int $skill): array
+    public function execute(string $userId, string $eventIdString, string $crewKeyString, int $skill): array
     {
         if (!in_array($skill, [0, 1, 2], true)) {
             throw new ValidationException(['skill' => 'Skill must be 0 (Novice), 1 (Competent crew), or 2 (Competent first mate)']);

@@ -25,14 +25,14 @@ class SetUserAdminUseCase
     /**
      * Execute the use case
      *
-     * @param int  $targetUserId     ID of the user to update
+     * @param string  $targetUserId     ID of the user to update
      * @param bool $isAdmin          Whether to grant (true) or revoke (false) admin
-     * @param int  $requestingUserId ID of the admin making the change
+     * @param string  $requestingUserId ID of the admin making the change
      * @return array Updated user summary (no password_hash)
      * @throws ValidationException   If an admin tries to modify their own status
      * @throws \RuntimeException     If the target user is not found
      */
-    public function execute(int $targetUserId, bool $isAdmin, int $requestingUserId): array
+    public function execute(string $targetUserId, bool $isAdmin, string $requestingUserId): array
     {
         if ($targetUserId === $requestingUserId) {
             throw new ValidationException(['user_id' => 'You cannot change your own admin status']);

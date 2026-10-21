@@ -1,6 +1,6 @@
 /**
  * Crew Registration Page Module
- * Handles crew member registration form (name, email and membership come from sailConnect)
+ * Handles crew member registration form (name, email, mobile number and membership come from sailConnect)
  */
 
 import { getCurrentUser, getIdentity, register } from '../authService.js';
@@ -8,7 +8,9 @@ import { hasToken } from '../tokenService.js';
 import { registerUrl, profileUrl } from '../ssoService.js';
 import { renderIdentitySummary } from '../enrollmentService.js';
 
-// Sign-up (name, email, password, membership) happens at sailConnect. Send visitors there first,
+let identity = null;
+
+// Sign-up (name, email, password, mobile number, membership) happens at sailConnect. Send visitors there first,
 // then they come back here to choose how they take part in Sail Friday.
 if (!hasToken()) {
     window.location.href = registerUrl();
@@ -16,24 +18,11 @@ if (!hasToken()) {
     // Already enrolled in Sail Friday
     window.location.href = 'dashboard.html';
 } else {
-    await renderIdentitySummary(await getIdentity(), profileUrl());
+    identity = await getIdentity();
+    await renderIdentitySummary(identity, profileUrl());
 }
 
-// Toggle mobile field visibility when WhatsApp checkbox changes
 const whatsappCheckbox = document.getElementById('whatsapp_group');
-const mobileGroup = document.getElementById('mobile-group');
-const mobileInput = document.getElementById('mobile');
-
-whatsappCheckbox.addEventListener('change', function() {
-    if (this.checked) {
-        mobileGroup.style.display = '';
-        mobileInput.required = true;
-    } else {
-        mobileGroup.style.display = 'none';
-        mobileInput.required = false;
-        mobileInput.value = '';
-    }
-});
 
 document.querySelector('form').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -43,14 +32,14 @@ document.querySelector('form').addEventListener('submit', async function(e) {
     submitButton.disabled = true;
     submitButton.textContent = 'Saving...';
 
-    // Validate mobile is provided when WhatsApp is checked
+    // The WhatsApp group uses the mobile number in the sailConnect account
     const wantsWhatsapp = whatsappCheckbox.checked;
-    const mobile = mobileInput.value.trim();
-    if (wantsWhatsapp && !mobile) {
+    if (wantsWhatsapp && !identity?.mobile) {
         submitButton.disabled = false;
         submitButton.textContent = originalLabel;
-        alert('Please enter your mobile number to join the WhatsApp group.');
-        mobileInput.focus();
+        if (confirm('To join the WhatsApp group, add your mobile number to your sailConnect account. Open your sailConnect account now?')) {
+            window.location.href = profileUrl();
+        }
         return;
     }
 
@@ -60,8 +49,7 @@ document.querySelector('form').addEventListener('submit', async function(e) {
         profile: {
             skill: parseInt(document.getElementById('skill').value, 10),
             experience: document.getElementById('experience').value.trim() || undefined,
-            socialPreference: wantsWhatsapp,
-            ...(wantsWhatsapp && mobile ? { mobile } : {})
+            socialPreference: wantsWhatsapp
         }
     };
 

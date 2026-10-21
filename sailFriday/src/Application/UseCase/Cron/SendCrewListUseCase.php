@@ -67,9 +67,9 @@ class SendCrewListUseCase
         $ccEmails = [];
         foreach ($crewedBoats as $crewedBoat) {
             $boat = $crewedBoat['boat'];
-            $ownerUserId = (int)($boat['owner_user_id'] ?? 0);
+            $ownerUserId = $boat['owner_user_id'] ?? null;
 
-            if ($ownerUserId === 0) {
+            if ($ownerUserId === null || $ownerUserId === '') {
                 $details[] = "Skipped boat {$boat['display_name']} (no linked owner account)";
                 $skipped++;
                 continue;

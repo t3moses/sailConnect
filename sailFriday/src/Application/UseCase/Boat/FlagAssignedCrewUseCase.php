@@ -42,7 +42,7 @@ class FlagAssignedCrewUseCase
     }
 
     /**
-     * @param int $userId Authenticated boat owner's user ID
+     * @param string $userId Authenticated boat owner's user ID
      * @param array<int, array{eventId: string, crewKey: string}> $flags
      * @return array<int, array{
      *     crew_key: string,
@@ -54,7 +54,7 @@ class FlagAssignedCrewUseCase
      * }>
      * @throws BoatNotFoundException
      */
-    public function execute(int $userId, array $flags): array
+    public function execute(string $userId, array $flags): array
     {
         $boat = $this->boatRepository->findByOwnerUserId($userId);
         if ($boat === null) {

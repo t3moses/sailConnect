@@ -18,7 +18,7 @@ use App\Domain\Enum\BoatRankDimension;
 class Boat
 {
     private ?int $id = null;
-    private ?int $userId = null;
+    private ?string $userId = null;
     private Rank $rank;
 
     /** @var array<string, int> Berths offered per event (event_id => berth_count) */
@@ -63,12 +63,12 @@ class Boat
         $this->id = $id;
     }
 
-    public function getOwnerUserId(): ?int
+    public function getOwnerUserId(): ?string
     {
         return $this->userId;
     }
 
-    public function setOwnerUserId(?int $userId): void
+    public function setOwnerUserId(?string $userId): void
     {
         $this->userId = $userId;
     }
@@ -97,19 +97,9 @@ class Boat
         return $this->ownerFirstName;
     }
 
-    public function setOwnerFirstName(string $firstName): void
-    {
-        $this->ownerFirstName = $firstName;
-    }
-
     public function getOwnerLastName(): string
     {
         return $this->ownerLastName;
-    }
-
-    public function setOwnerLastName(string $lastName): void
-    {
-        $this->ownerLastName = $lastName;
     }
 
     public function getOwnerKey(): CrewKey
@@ -120,11 +110,6 @@ class Boat
     public function getOwnerMobile(): string
     {
         return $this->ownerMobile;
-    }
-
-    public function setOwnerMobile(string $mobile): void
-    {
-        $this->ownerMobile = $mobile;
     }
 
     // === Capacity ===

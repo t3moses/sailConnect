@@ -110,7 +110,7 @@ function transformUserMeResponse(apiResponse) {
 
     // Build transformed user object
     const transformedUser = {
-        // Map id to userId (convert integer to string for consistency)
+        // userId is the sailConnect user ID
         userId: String(user.id),
         email: user.email,
         accountType: user.accountType,
@@ -130,7 +130,6 @@ function transformUserMeResponse(apiResponse) {
 
         // Map timestamp field names
         createdAt: user.createdAt,
-        lastSignIn: user.lastLogin,
 
         // Additional fields from API
         isAdmin: user.isAdmin

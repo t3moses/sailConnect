@@ -26,13 +26,13 @@ class UserRepository implements UserRepositoryInterface
     /**
      * Find user by ID
      *
-     * @param int $id User ID
+     * @param string $id User ID (the sailConnect user ID)
      * @return User|null User entity or null if not found
      */
-    public function findById(int $id): ?User
+    public function findById(string $id): ?User
     {
         $stmt = $this->pdo->prepare('
-            SELECT * FROM users WHERE id = :id LIMIT 1
+            SELECT * FROM users_full WHERE auth_user_id = :id LIMIT 1
         ');
 
         $stmt->execute(['id' => $id]);
@@ -54,7 +54,7 @@ class UserRepository implements UserRepositoryInterface
     public function findByEmail(string $email): ?User
     {
         $stmt = $this->pdo->prepare('
-            SELECT * FROM users WHERE email = :email LIMIT 1
+            SELECT * FROM users_full WHERE email = :email COLLATE NOCASE LIMIT 1
         ');
 
         $stmt->execute(['email' => $email]);
@@ -68,21 +68,6 @@ class UserRepository implements UserRepositoryInterface
     }
 
     /**
-     * Find user by sailConnect (auth service) user ID
-     *
-     * @param string $authUserId Auth user ID
-     * @return User|null User entity or null if not linked
-     */
-    public function findByAuthUserId(string $authUserId): ?User
-    {
-        $stmt = $this->pdo->prepare('SELECT * FROM users WHERE auth_user_id = :id LIMIT 1');
-        $stmt->execute(['id' => $authUserId]);
-        $row = $stmt->fetch();
-
-        return $row === false ? null : $this->hydrate($row);
-    }
-
-    /**
      * Check if email already exists
      *
      * @param string $email Email address to check
@@ -91,7 +76,7 @@ class UserRepository implements UserRepositoryInterface
     public function emailExists(string $email): bool
     {
         $stmt = $this->pdo->prepare('
-            SELECT COUNT(*) FROM users WHERE email = :email
+            SELECT COUNT(*) FROM users_full WHERE email = :email COLLATE NOCASE
         ');
 
         $stmt->execute(['email' => $email]);
@@ -108,22 +93,29 @@ class UserRepository implements UserRepositoryInterface
     public function save(User $user): void
     {
         if ($user->getId() === null) {
-            $this->insert($user);
-        } else {
+            throw new \InvalidArgumentException('A user needs its sailConnect user ID before it can be saved');
+        }
+
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM users WHERE auth_user_id = :id');
+        $stmt->execute(['id' => $user->getId()]);
+
+        if ((int)$stmt->fetchColumn() > 0) {
             $this->update($user);
+        } else {
+            $this->insert($user);
         }
     }
 
     /**
      * Delete user by ID
      *
-     * @param int $id User ID to delete
+     * @param string $id User ID to delete
      * @return void
      */
-    public function delete(int $id): void
+    public function delete(string $id): void
     {
         $stmt = $this->pdo->prepare('
-            DELETE FROM users WHERE id = :id
+            DELETE FROM users WHERE auth_user_id = :id
         ');
 
         $stmt->execute(['id' => $id]);
@@ -147,7 +139,7 @@ class UserRepository implements UserRepositoryInterface
      */
     public function findAll(): array
     {
-        $stmt = $this->pdo->query('SELECT * FROM users ORDER BY email ASC');
+        $stmt = $this->pdo->query('SELECT * FROM users_full ORDER BY email ASC');
         $rows = $stmt->fetchAll();
 
         return array_map(fn($row) => $this->hydrate($row), $rows);
@@ -162,24 +154,17 @@ class UserRepository implements UserRepositoryInterface
     private function insert(User $user): void
     {
         $stmt = $this->pdo->prepare('
-            INSERT INTO users (email, password_hash, account_type, is_admin, last_login, last_logout, created_at, updated_at, auth_user_id)
-            VALUES (:email, :password_hash, :account_type, :is_admin, :last_login, :last_logout, :created_at, :updated_at, :auth_user_id)
+            INSERT INTO users (auth_user_id, account_type, is_program_admin, created_at, updated_at)
+            VALUES (:id, :account_type, :is_program_admin, :created_at, :updated_at)
         ');
 
         $stmt->execute([
-            'email' => $user->getEmail(),
-            'password_hash' => $user->getPasswordHash(),
+            'id' => $user->getId(),
             'account_type' => $user->getAccountType(),
-            'is_admin' => $user->isAdmin() ? 1 : 0,
-            'last_login' => $user->getLastLogin()?->format('Y-m-d H:i:s'),
-            'last_logout' => $user->getLastLogout()?->format('Y-m-d H:i:s'),
+            'is_program_admin' => $user->isAdmin() ? 1 : 0,
             'created_at' => $user->getCreatedAt()->format('Y-m-d H:i:s'),
             'updated_at' => $user->getUpdatedAt()->format('Y-m-d H:i:s'),
-            'auth_user_id' => $user->getAuthUserId(),
         ]);
-
-        // Set the auto-generated ID on the entity
-        $user->setId((int)$this->pdo->lastInsertId());
     }
 
     /**
@@ -192,27 +177,17 @@ class UserRepository implements UserRepositoryInterface
     {
         $stmt = $this->pdo->prepare('
             UPDATE users
-            SET email = :email,
-                password_hash = :password_hash,
-                account_type = :account_type,
-                is_admin = :is_admin,
-                last_login = :last_login,
-                last_logout = :last_logout,
-                updated_at = :updated_at,
-                auth_user_id = :auth_user_id
-            WHERE id = :id
+            SET account_type = :account_type,
+                is_program_admin = :is_program_admin,
+                updated_at = :updated_at
+            WHERE auth_user_id = :id
         ');
 
         $stmt->execute([
             'id' => $user->getId(),
-            'email' => $user->getEmail(),
-            'password_hash' => $user->getPasswordHash(),
             'account_type' => $user->getAccountType(),
-            'is_admin' => $user->isAdmin() ? 1 : 0,
-            'last_login' => $user->getLastLogin()?->format('Y-m-d H:i:s'),
-            'last_logout' => $user->getLastLogout()?->format('Y-m-d H:i:s'),
+            'is_program_admin' => $user->isAdmin() ? 1 : 0,
             'updated_at' => $user->getUpdatedAt()->format('Y-m-d H:i:s'),
-            'auth_user_id' => $user->getAuthUserId(),
         ]);
     }
 
@@ -225,18 +200,13 @@ class UserRepository implements UserRepositoryInterface
     private function hydrate(array $row): User
     {
         $user = new User(
-            email: $row['email'],
-            passwordHash: $row['password_hash'],
+            email: (string)$row['email'],
             accountType: $row['account_type'],
-            isAdmin: (bool)$row['is_admin'],
-            lastLogin: $row['last_login'] ? new \DateTimeImmutable($row['last_login']) : null,
-            lastLogout: $row['last_logout'] ? new \DateTimeImmutable($row['last_logout']) : null,
+            isAdmin: (bool)$row['is_program_admin'],
             createdAt: new \DateTimeImmutable($row['created_at']),
             updatedAt: new \DateTimeImmutable($row['updated_at']),
-            authUserId: $row['auth_user_id'] ?? null,
+            id: (string)$row['auth_user_id'],
         );
-
-        $user->setId((int)$row['id']);
 
         return $user;
     }

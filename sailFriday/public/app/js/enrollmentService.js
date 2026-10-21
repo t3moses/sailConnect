@@ -11,7 +11,7 @@ function escapeHtml(text) {
 
 /**
  * Fill #identity-summary with the identity that will be used for the Sail Friday profile
- * @param {Object|null} identity - { email, firstName, lastName, isMember, membershipNumber }
+ * @param {Object|null} identity - { email, firstName, lastName, mobile, isMember, membershipNumber }
  * @param {string} profileUrl - Link to the sailConnect account page
  */
 export async function renderIdentitySummary(identity, profileUrl) {
@@ -26,9 +26,12 @@ export async function renderIdentitySummary(identity, profileUrl) {
     const membership = identity.isMember
         ? `NSC member no. ${escapeHtml(identity.membershipNumber)}`
         : 'Not an NSC member';
+    const mobile = identity.mobile
+        ? `Mobile ${escapeHtml(identity.mobile)}`
+        : 'No mobile number on file';
     box.innerHTML = `
         <p><strong>${escapeHtml(identity.firstName)} ${escapeHtml(identity.lastName)}</strong>
-        (${escapeHtml(identity.email)}) &middot; ${membership}</p>
-        <p><small>These details come from your sailConnect account.
+        (${escapeHtml(identity.email)}) &middot; ${mobile} &middot; ${membership}</p>
+        <p><small>These details come from your sailConnect account; Sail Friday does not store them.
         <a href="${escapeHtml(profileUrl)}">Change them there</a>.</small></p>`;
 }

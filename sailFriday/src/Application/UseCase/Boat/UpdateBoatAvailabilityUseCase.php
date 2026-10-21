@@ -36,14 +36,14 @@ class UpdateBoatAvailabilityUseCase
     /**
      * Execute the use case
      *
-     * @param int $userId
+     * @param string $userId
      * @param UpdateAvailabilityRequest $request
      * @return BoatResponse
      * @throws ValidationException
      * @throws BoatNotFoundException
      * @throws EventNotFoundException
      */
-    public function execute(int $userId, UpdateAvailabilityRequest $request): BoatResponse
+    public function execute(string $userId, UpdateAvailabilityRequest $request): BoatResponse
     {
         // Check blackout window — only active when an event is scheduled today
         $config = $this->seasonRepository->getConfig();

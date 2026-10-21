@@ -24,11 +24,11 @@ class GetUserDetailUseCase
     /**
      * Execute the use case
      *
-     * @param int $userId
+     * @param string $userId
      * @return array{user: array, crew: array|null}
      * @throws \RuntimeException If the user is not found
      */
-    public function execute(int $userId): array
+    public function execute(string $userId): array
     {
         $user = $this->userRepository->findById($userId);
 

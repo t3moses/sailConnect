@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Presentation\Middleware;
 
 use App\Application\Port\Repository\UserRepositoryInterface;
-use App\Application\UseCase\Auth\SyncIdentityUseCase;
 use App\Presentation\Response\JsonResponse;
 use SailConnect\Auth\Client\SessionVerifier;
 
@@ -25,7 +24,6 @@ class AuthSessionMiddleware
     public function __construct(
         private SessionVerifier $verifier,
         private UserRepositoryInterface $userRepository,
-        private SyncIdentityUseCase $syncIdentity,
     ) {
     }
 
@@ -42,8 +40,8 @@ class AuthSessionMiddleware
     /**
      * Authenticate and resolve the local sailFriday user.
      *
-     * @return array|null ['user_id' => int, 'email' => string, 'account_type' => string, 'is_admin' => bool,
-     *                     'auth_user_id' => string] or null (see authenticationFailed())
+     * @return array|null ['user_id' => string, 'email' => string, 'account_type' => string, 'is_admin' => bool,
+     *                     'identity' => array] or null (see authenticationFailed())
      */
     public function authenticate(): ?array
     {
@@ -53,20 +51,18 @@ class AuthSessionMiddleware
             return null;
         }
 
-        $user = $this->userRepository->findByAuthUserId($identity['user_id']);
+        $user = $this->userRepository->findById($identity['user_id']);
         if ($user === null) {
             $this->failure = self::FAIL_NOT_ENROLLED;
             return null;
         }
-
-        $this->syncIdentity->execute($user, $identity);
 
         return [
             'user_id' => $user->getId(),
             'email' => $user->getEmail(),
             'account_type' => $user->getAccountType(),
             'is_admin' => $user->isAdmin(),
-            'auth_user_id' => $identity['user_id'],
+            'identity' => $identity,
         ];
     }
 

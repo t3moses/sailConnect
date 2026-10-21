@@ -55,7 +55,7 @@ class UserController
     public function addProfile(array $body, array $auth): JsonResponse
     {
         $request = AddProfileRequest::fromArray($body);
-        $response = $this->addProfileUseCase->execute($auth['user_id'], $request);
+        $response = $this->addProfileUseCase->execute($auth['user_id'], $request, $auth['identity']);
 
         return JsonResponse::success([
             'message' => 'Profile added successfully',

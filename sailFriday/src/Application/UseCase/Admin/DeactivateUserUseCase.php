@@ -40,13 +40,13 @@ class DeactivateUserUseCase
     /**
      * Execute the use case
      *
-     * @param int $targetUserId     ID of the user to deactivate
-     * @param int $requestingUserId ID of the admin making the change
-     * @return array{deactivated: bool, user_id: int, crew_key: string, withdrawn_from_future_events: bool}
+     * @param string $targetUserId     ID of the user to deactivate
+     * @param string $requestingUserId ID of the admin making the change
+     * @return array{deactivated: bool, user_id: string, crew_key: string, withdrawn_from_future_events: bool}
      * @throws ValidationException If an admin targets their own account, or the user has no linked crew
      * @throws \RuntimeException   If the target user is not found
      */
-    public function execute(int $targetUserId, int $requestingUserId): array
+    public function execute(string $targetUserId, string $requestingUserId): array
     {
         if ($targetUserId === $requestingUserId) {
             throw new ValidationException(['user_id' => 'You cannot deactivate your own account']);

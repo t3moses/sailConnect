@@ -72,7 +72,10 @@ class RankingService
         if ($squad !== null) {
             $ownerKey = $boat->getOwnerKey();
             foreach ($squad->all() as $crew) {
-                if ($crew->getKey()->equals($ownerKey)) {
+                // The crew key is fixed at registration while the owner name follows sailConnect,
+                // so the shared user account identifies the owner as well as the key does.
+                $sameUser = $boat->getOwnerUserId() !== null && $crew->getUserId() === $boat->getOwnerUserId();
+                if ($sameUser || $crew->getKey()->equals($ownerKey)) {
                     $flexibility = 0; // Flexible (owner is crew)
                     break;
                 }

@@ -26,11 +26,11 @@ class GetCrewAvailabilityUseCase
     /**
      * Execute the use case
      *
-     * @param int $userId
+     * @param string $userId
      * @return AvailabilityResponse
      * @throws CrewNotFoundException
      */
-    public function execute(int $userId): AvailabilityResponse
+    public function execute(string $userId): AvailabilityResponse
     {
         // Find crew by user ID
         $crew = $this->crewRepository->findByUserId($userId);

@@ -74,7 +74,7 @@ class SendBoatOwnerCrewListUseCase
                 continue;
             }
 
-            $user = $this->userRepository->findById((int)$ownerUserId);
+            $user = $this->userRepository->findById($ownerUserId);
 
             if ($user === null) {
                 $details[] = "Skipped boat {$boatDisplayName} (owner user account not found)";

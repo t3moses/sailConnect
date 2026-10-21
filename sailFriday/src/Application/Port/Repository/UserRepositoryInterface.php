@@ -18,10 +18,10 @@ interface UserRepositoryInterface
     /**
      * Find user by ID
      *
-     * @param int $id User ID
+     * @param string $id User ID (the sailConnect user ID)
      * @return User|null User entity or null if not found
      */
-    public function findById(int $id): ?User;
+    public function findById(string $id): ?User;
 
     /**
      * Find user by email address
@@ -32,14 +32,6 @@ interface UserRepositoryInterface
     public function findByEmail(string $email): ?User;
 
     /**
-     * Find user by sailConnect (auth service) user ID
-     *
-     * @param string $authUserId Auth user ID
-     * @return User|null User entity or null if not linked
-     */
-    public function findByAuthUserId(string $authUserId): ?User;
-
-    /**
      * Check if email already exists
      *
      * @param string $email Email address to check
@@ -48,7 +40,7 @@ interface UserRepositoryInterface
     public function emailExists(string $email): bool;
 
     /**
-     * Save user (create or update)
+     * Save user (create or update); the user must already have its sailConnect user ID
      *
      * @param User $user User entity to save
      * @return void
@@ -58,10 +50,10 @@ interface UserRepositoryInterface
     /**
      * Delete user by ID
      *
-     * @param int $id User ID to delete
+     * @param string $id User ID to delete
      * @return void
      */
-    public function delete(int $id): void;
+    public function delete(string $id): void;
 
     /**
      * Get total user count

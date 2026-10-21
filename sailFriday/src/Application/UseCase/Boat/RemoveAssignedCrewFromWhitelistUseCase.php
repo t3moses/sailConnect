@@ -43,7 +43,7 @@ class RemoveAssignedCrewFromWhitelistUseCase
      * @throws CrewNotFoundException
      * @throws ValidationException
      */
-    public function execute(int $userId, string $eventIdString, string $crewKeyString): array
+    public function execute(string $userId, string $eventIdString, string $crewKeyString): array
     {
         $boat = $this->boatRepository->findByOwnerUserId($userId);
         if ($boat === null) {

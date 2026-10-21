@@ -14,12 +14,11 @@ use App\Domain\Entity\User;
 final readonly class UserResponse
 {
     public function __construct(
-        public int $id,
+        public string $id,
         public string $email,
         public string $accountType,
         public bool $isAdmin,
         public ?string $createdAt = null,
-        public ?string $lastLogin = null,
     ) {
     }
 
@@ -37,7 +36,6 @@ final readonly class UserResponse
             accountType: $user->getAccountType(),
             isAdmin: $user->isAdmin(),
             createdAt: $user->getCreatedAt()->format('Y-m-d H:i:s'),
-            lastLogin: $user->getLastLogin()?->format('Y-m-d H:i:s'),
         );
     }
 
@@ -57,10 +55,6 @@ final readonly class UserResponse
 
         if ($this->createdAt !== null) {
             $data['createdAt'] = $this->createdAt;
-        }
-
-        if ($this->lastLogin !== null) {
-            $data['lastLogin'] = $this->lastLogin;
         }
 
         return $data;

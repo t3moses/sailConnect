@@ -38,7 +38,7 @@ if (user.accountType === 'crew') {
         <h2>Your Info</h2>
 
         <div class="alert alert-info">
-            Your name, email address, password and membership number are managed in your
+            Your name, email address, mobile number, password and membership number are managed in your
             <a href="${profileUrl()}">sailConnect account</a>.
         </div>
 
@@ -56,6 +56,12 @@ if (user.accountType === 'crew') {
             <label for="email">Email *</label>
             <input type="email" id="email" name="email" required placeholder="your.email@example.com" value="${user.email}" disabled style="background: #f5f5f5; cursor: not-allowed;">
             <small>Change your email address in your sailConnect account.</small>
+        </div>
+
+        <div class="form-group">
+            <label for="mobile">Mobile Number</label>
+            <input type="tel" id="mobile" name="mobile" placeholder="Not set" value="${user.profile.mobile || ''}" disabled style="background: #f5f5f5; cursor: not-allowed;">
+            <small>Change your mobile number in your sailConnect account.</small>
         </div>
 
         <div class="form-group">
@@ -78,12 +84,6 @@ if (user.accountType === 'crew') {
             <small>Stay connected with other sailors and get event updates!</small>
         </div>
 
-        <div class="form-group" id="mobile-group" style="display: ${user.profile.whatsappGroup || user.profile.mobile ? '' : 'none'};">
-            <label for="mobile">Mobile Number${user.profile.whatsappGroup ? ' *' : ''}</label>
-            <input type="tel" id="mobile" name="mobile" placeholder="(555) 123-4567" value="${user.profile.mobile || ''}" ${user.profile.whatsappGroup ? 'required' : ''}>
-            <small>Required to add you to the WhatsApp group.</small>
-        </div>
-
     `;
 } else {
     // Boat owner form
@@ -91,7 +91,7 @@ if (user.accountType === 'crew') {
         <h2>About You</h2>
 
         <div class="alert alert-info">
-            Your name, email address, password and membership number are managed in your
+            Your name, email address, mobile number, password and membership number are managed in your
             <a href="${profileUrl()}">sailConnect account</a>.
         </div>
 
@@ -112,9 +112,9 @@ if (user.accountType === 'crew') {
         </div>
 
         <div class="form-group">
-            <label for="phone">Phone Number *</label>
-            <input type="tel" id="phone" name="phone" required placeholder="(555) 123-4567" value="${user.profile.phone}">
-            <small>For weather-related morning calls and the WhatsApp group (if you join).</small>
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" name="phone" placeholder="Not set" value="${user.profile.phone}" disabled style="background: #f5f5f5; cursor: not-allowed;">
+            <small>For weather-related morning calls and the WhatsApp group (if you join). Change it in your sailConnect account.</small>
         </div>
 
         <h2 style="margin-top: 4rem; margin-bottom: 2rem;">About Your Boat</h2>
@@ -175,22 +175,11 @@ if (user.accountType === 'crew') {
 
 formContent.innerHTML = formHTML;
 
-// Wire up WhatsApp → mobile toggle for crew
+// The WhatsApp group uses the mobile number in the sailConnect account
 if (user.accountType === 'crew') {
-    const whatsappCheckbox = document.getElementById('whatsapp_group');
-    const mobileGroup = document.getElementById('mobile-group');
-    const mobileInput = document.getElementById('mobile');
-    const mobileLabel = mobileGroup.querySelector('label');
-
-    whatsappCheckbox.addEventListener('change', function() {
-        if (this.checked) {
-            mobileGroup.style.display = '';
-            mobileInput.required = true;
-            mobileLabel.textContent = 'Mobile Number *';
-        } else {
-            mobileGroup.style.display = 'none';
-            mobileInput.required = false;
-            mobileLabel.textContent = 'Mobile Number';
+    document.getElementById('whatsapp_group').addEventListener('change', function() {
+        if (this.checked && !user.profile.mobile && confirm('To join the WhatsApp group, add your mobile number to your sailConnect account. Open your sailConnect account now?')) {
+            window.location.href = profileUrl();
         }
     });
 }
@@ -210,12 +199,10 @@ document.getElementById('edit-profile-form').addEventListener('submit', async fu
     if (user.accountType === 'crew') {
         profileUpdates = {
             experience: document.getElementById('experience').value.trim(),
-            socialPreference: document.getElementById('whatsapp_group').checked,
-            mobile: document.getElementById('mobile').value
+            socialPreference: document.getElementById('whatsapp_group').checked
         };
     } else {
         profileUpdates = {
-            ownerMobile: document.getElementById('phone').value,
             displayName: document.getElementById('boat_name').value,
             minBerths: document.getElementById('min_crew').value,
             maxBerths: document.getElementById('max_crew').value,

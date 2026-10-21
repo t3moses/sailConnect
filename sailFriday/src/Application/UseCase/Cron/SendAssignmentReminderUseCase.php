@@ -78,7 +78,7 @@ class SendAssignmentReminderUseCase
                     continue;
                 }
 
-                $user = $this->userRepository->findById((int)$userId);
+                $user = $this->userRepository->findById($userId);
 
                 if ($user === null) {
                     $details[] = "Skipped crew {$crewName} (user account not found)";

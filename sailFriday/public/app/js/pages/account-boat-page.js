@@ -1,6 +1,6 @@
 /**
  * Boat Owner Registration Page Module
- * Handles boat owner registration form
+ * Handles boat owner registration form (name, email, mobile number and membership come from sailConnect)
  */
 
 import { getCurrentUser, getIdentity, register } from '../authService.js';
@@ -8,7 +8,9 @@ import { hasToken } from '../tokenService.js';
 import { registerUrl, profileUrl } from '../ssoService.js';
 import { renderIdentitySummary } from '../enrollmentService.js';
 
-// Sign-up (name, email, password, membership) happens at sailConnect. Send visitors there first,
+let identity = null;
+
+// Sign-up (name, email, password, mobile number, membership) happens at sailConnect. Send visitors there first,
 // then they come back here to choose how they take part in Sail Friday.
 if (!hasToken()) {
     window.location.href = registerUrl();
@@ -16,7 +18,8 @@ if (!hasToken()) {
     // Already enrolled in Sail Friday
     window.location.href = 'dashboard.html';
 } else {
-    await renderIdentitySummary(await getIdentity(), profileUrl());
+    identity = await getIdentity();
+    await renderIdentitySummary(identity, profileUrl());
 }
 
 document.querySelector('form').addEventListener('submit', async function(e) {
@@ -27,11 +30,20 @@ document.querySelector('form').addEventListener('submit', async function(e) {
     submitButton.disabled = true;
     submitButton.textContent = 'Saving...';
 
+    // Boat owners are reached by phone, using the mobile number in the sailConnect account
+    if (!identity?.mobile) {
+        submitButton.disabled = false;
+        submitButton.textContent = originalLabel;
+        if (confirm('Boat owners need a mobile number. Add one to your sailConnect account now?')) {
+            window.location.href = profileUrl();
+        }
+        return;
+    }
+
     // Create user data object
     const userData = {
         accountType: 'boat_owner',
         profile: {
-            ownerMobile: document.getElementById('phone').value,
             displayName: document.getElementById('boat_name').value,
             minBerths: document.getElementById('min_crew').value,
             maxBerths: document.getElementById('max_crew').value,

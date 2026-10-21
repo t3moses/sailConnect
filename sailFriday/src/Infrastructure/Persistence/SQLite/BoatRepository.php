@@ -29,7 +29,7 @@ class BoatRepository implements BoatRepositoryInterface
     public function findByKey(BoatKey $key): ?Boat
     {
         $stmt = $this->pdo->prepare('
-            SELECT * FROM boats WHERE key = :key LIMIT 1
+            SELECT * FROM boats_full WHERE key = :key LIMIT 1
         ');
         $stmt->execute(['key' => $key->toString()]);
         $row = $stmt->fetch();
@@ -44,7 +44,7 @@ class BoatRepository implements BoatRepositoryInterface
     public function findByOwnerName(string $firstName, string $lastName): ?Boat
     {
         $stmt = $this->pdo->prepare('
-            SELECT * FROM boats
+            SELECT * FROM boats_full
             WHERE owner_first_name = :first_name
             AND owner_last_name = :last_name
             LIMIT 1
@@ -62,10 +62,10 @@ class BoatRepository implements BoatRepositoryInterface
         return $this->hydrate($row);
     }
 
-    public function findByOwnerUserId(int $userId): ?Boat
+    public function findByOwnerUserId(string $userId): ?Boat
     {
         $stmt = $this->pdo->prepare('
-            SELECT * FROM boats WHERE owner_user_id = :owner_user_id LIMIT 1
+            SELECT * FROM boats_full WHERE owner_user_id = :owner_user_id LIMIT 1
         ');
         $stmt->execute(['owner_user_id' => $userId]);
         $row = $stmt->fetch();
@@ -79,7 +79,7 @@ class BoatRepository implements BoatRepositoryInterface
 
     public function findAll(): array
     {
-        $stmt = $this->pdo->query('SELECT * FROM boats ORDER BY display_name');
+        $stmt = $this->pdo->query('SELECT * FROM boats_full ORDER BY display_name');
         $rows = $stmt->fetchAll();
 
         if (empty($rows)) {
@@ -108,7 +108,7 @@ class BoatRepository implements BoatRepositoryInterface
     public function findAvailableForEvent(EventId $eventId): array
     {
         $stmt = $this->pdo->prepare('
-            SELECT b.* FROM boats b
+            SELECT b.* FROM boats_full b
             INNER JOIN boat_availability ba ON b.id = ba.boat_id
             WHERE ba.event_id = :event_id AND ba.berths > 0
             ORDER BY b.display_name
@@ -236,14 +236,12 @@ class BoatRepository implements BoatRepositoryInterface
     {
         $stmt = $this->pdo->prepare('
             INSERT INTO boats (
-                key, display_name, owner_first_name, owner_last_name,
-                owner_mobile, min_berths, max_berths,
+                key, display_name, min_berths, max_berths,
                 assistance_required, social_preference,
                 flexibility_rank, absence_rank,
                 owner_user_id
             ) VALUES (
-                :key, :display_name, :owner_first_name, :owner_last_name,
-                :owner_mobile, :min_berths, :max_berths,
+                :key, :display_name, :min_berths, :max_berths,
                 :assistance_required, :social_preference,
                 :flexibility_rank, :absence_rank,
                 :owner_user_id
@@ -254,9 +252,6 @@ class BoatRepository implements BoatRepositoryInterface
         $stmt->execute([
             'key' => $boat->getKey()->toString(),
             'display_name' => $boat->getDisplayName(),
-            'owner_first_name' => $boat->getOwnerFirstName(),
-            'owner_last_name' => $boat->getOwnerLastName(),
-            'owner_mobile' => $boat->getOwnerMobile(),
             'min_berths' => $boat->getMinBerths(),
             'max_berths' => $boat->getMaxBerths(),
             'assistance_required' => $boat->requiresAssistance() ? 'Yes' : 'No',
@@ -280,9 +275,6 @@ class BoatRepository implements BoatRepositoryInterface
         $stmt = $this->pdo->prepare('
             UPDATE boats SET
                 display_name = :display_name,
-                owner_first_name = :owner_first_name,
-                owner_last_name = :owner_last_name,
-                owner_mobile = :owner_mobile,
                 min_berths = :min_berths,
                 max_berths = :max_berths,
                 assistance_required = :assistance_required,
@@ -297,9 +289,6 @@ class BoatRepository implements BoatRepositoryInterface
         $stmt->execute([
             'id' => $boat->getId(),
             'display_name' => $boat->getDisplayName(),
-            'owner_first_name' => $boat->getOwnerFirstName(),
-            'owner_last_name' => $boat->getOwnerLastName(),
-            'owner_mobile' => $boat->getOwnerMobile(),
             'min_berths' => $boat->getMinBerths(),
             'max_berths' => $boat->getMaxBerths(),
             'assistance_required' => $boat->requiresAssistance() ? 'Yes' : 'No',
@@ -378,7 +367,7 @@ class BoatRepository implements BoatRepositoryInterface
 
         // Set owner_user_id if present
         if (isset($row['owner_user_id']) && $row['owner_user_id'] !== null) {
-            $boat->setOwnerUserId((int)$row['owner_user_id']);
+            $boat->setOwnerUserId((string)$row['owner_user_id']);
         }
 
         // Set rank
@@ -522,7 +511,7 @@ class BoatRepository implements BoatRepositoryInterface
 
         // Set owner_user_id if present
         if (isset($row['owner_user_id']) && $row['owner_user_id'] !== null) {
-            $boat->setOwnerUserId((int)$row['owner_user_id']);
+            $boat->setOwnerUserId((string)$row['owner_user_id']);
         }
 
         // Set rank

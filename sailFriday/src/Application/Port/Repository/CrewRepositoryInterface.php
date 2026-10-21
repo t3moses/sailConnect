@@ -38,10 +38,10 @@ interface CrewRepositoryInterface
     /**
      * Find a crew member by user ID
      *
-     * @param int $userId
+     * @param string $userId
      * @return Crew|null
      */
-    public function findByUserId(int $userId): ?Crew;
+    public function findByUserId(string $userId): ?Crew;
 
     /**
      * Get all crew members

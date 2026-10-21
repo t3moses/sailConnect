@@ -36,10 +36,10 @@ interface BoatRepositoryInterface
     /**
      * Find a boat by owner user ID
      *
-     * @param int $userId
+     * @param string $userId
      * @return Boat|null
      */
-    public function findByOwnerUserId(int $userId): ?Boat;
+    public function findByOwnerUserId(string $userId): ?Boat;
 
     /**
      * Get all boats

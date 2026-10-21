@@ -625,13 +625,6 @@ $container->set(\App\Presentation\Controller\UserController::class, function ($c
 // Presentation Layer - Middleware
 // =======================
 
-$container->set(\App\Application\UseCase\Auth\SyncIdentityUseCase::class, function ($c) {
-    return new \App\Application\UseCase\Auth\SyncIdentityUseCase(
-        $c->get(UserRepositoryInterface::class),
-        $c->get(CrewRepositoryInterface::class)
-    );
-});
-
 $container->set(\SailConnect\Auth\Client\SessionVerifier::class, function () use ($config) {
     return \SailConnect\Auth\Client\SessionVerifier::fromAuthDir($config['auth']['dir']);
 });
@@ -639,8 +632,7 @@ $container->set(\SailConnect\Auth\Client\SessionVerifier::class, function () use
 $container->set(\App\Presentation\Middleware\AuthSessionMiddleware::class, function ($c) {
     return new \App\Presentation\Middleware\AuthSessionMiddleware(
         $c->get(\SailConnect\Auth\Client\SessionVerifier::class),
-        $c->get(UserRepositoryInterface::class),
-        $c->get(\App\Application\UseCase\Auth\SyncIdentityUseCase::class)
+        $c->get(UserRepositoryInterface::class)
     );
 });
 

@@ -64,6 +64,7 @@ class AuthController
                 'displayName' => $auth['display_name'],
                 'isMember' => (bool)$auth['is_member'],
                 'membershipNumber' => $auth['membership_number'],
+                'mobile' => $auth['mobile_number'] ?? null,
             ],
         ]);
     }

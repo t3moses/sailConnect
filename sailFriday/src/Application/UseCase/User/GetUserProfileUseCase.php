@@ -29,11 +29,11 @@ class GetUserProfileUseCase
     /**
      * Execute get user profile
      *
-     * @param int $userId User ID
+     * @param string $userId User ID
      * @return ProfileResponse Complete profile with user, crew, and boat data
      * @throws \RuntimeException If user not found
      */
-    public function execute(int $userId): ProfileResponse
+    public function execute(string $userId): ProfileResponse
     {
         // Get user
         $user = $this->userRepository->findById($userId);
