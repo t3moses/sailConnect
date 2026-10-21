@@ -138,28 +138,10 @@ cp database/backups/backup_YYYYMMDD_HHMMSS.db database/sailFriday.db
 
 ## Test Data Seeding
 
-The project includes a seeder for populating test data:
-
-```bash
-# Run all seeders
-vendor/bin/phinx seed:run
-
-# Run specific seeder
-vendor/bin/phinx seed:run -s TestDataSeeder
-```
-
-**Seeders:**
-
-- `TestDataSeeder.php` - Creates sample boats, crews, events, and assignments for testing
-
-### Creating New Seeders
-
-```bash
-# Phinx doesn't have a seed generator, so create manually
-touch database/seeds/MySeeder.php
-```
-
-See [Phinx Seeding documentation](https://book.cakephp.org/phinx/0/en/seeding.html) for details.
+There are no seeders. Users, names, mobile numbers and membership now live in the sailConnect auth database, so test data
+is created through the auth service (or, in tests, by `IntegrationTestCase::createIdentity()` / `createLinkedUser()`).
+Phinx seeders can still be added under `database/seeds/` (see the
+[Phinx Seeding documentation](https://book.cakephp.org/phinx/0/en/seeding.html)).
 
 ## Legacy CSV Migration
 
