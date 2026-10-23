@@ -9,9 +9,11 @@ and `user_type` (`boat_owner` or `crew`). Email and names are read from the auth
 
 ## Flow
 
-1. **Join Now** (`/join`): pick boat owner or crew. Signed-out visitors are sent to the auth registration page and return to
-   `/join?type=...` with their choice preselected; signed-in visitors are enrolled straight away.
-2. `/dashboard` shows the profile and the lists of boat owners and crew. It redirects to `/join` for a signed-in user who has not joined.
+1. **Join Now** (`/join`, or `/register`): a signed-out visitor goes to the auth service's `/start` page and enters an email address.
+   An existing account continues to sign-in, a new email to registration, and either way the visitor returns to `/join`.
+2. `/join` (signed in, no Match Race record): pick boat owner or crew, click "Let's Go!", land on the landing page.
+3. A signed-in user without a record is redirected from `/` and `/dashboard` to `/join`. A user with a record is redirected from `/join` to `/`.
+4. **Sign In** goes to the auth sign-in page; there is no app-owned sign-in page. `/dashboard` shows the profile and the boat owner and crew lists.
 
 ## Local development
 

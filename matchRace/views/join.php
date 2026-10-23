@@ -16,7 +16,7 @@
                     <div class="form-group">
                         <div class="radio-group">
                             <div class="radio-option">
-                                <input type="radio" id="crew" name="user_type" value="crew" required<?= $selected === 'crew' ? ' checked' : '' ?>>
+                                <input type="radio" id="crew" name="user_type" value="crew" required>
                                 <label for="crew">
                                     <div style="font-size: 4rem; margin-bottom: 1rem;">🌊</div>
                                     <div style="font-size: 1.3rem; margin-bottom: 0.5rem;">Crew Member</div>
@@ -25,7 +25,7 @@
                             </div>
 
                             <div class="radio-option">
-                                <input type="radio" id="boat_owner" name="user_type" value="boat_owner" required<?= $selected === 'boat_owner' ? ' checked' : '' ?>>
+                                <input type="radio" id="boat_owner" name="user_type" value="boat_owner" required>
                                 <label for="boat_owner">
                                     <div style="font-size: 4rem; margin-bottom: 1rem;">⛵</div>
                                     <div style="font-size: 1.3rem; margin-bottom: 0.5rem;">Boat Owner</div>
@@ -36,13 +36,9 @@
                     </div>
 
                     <div style="text-align: center; margin-top: 3rem;">
-                        <button type="submit" class="btn btn-primary"><?= $signedIn ? "Let's Go!" : 'Continue' ?></button>
+                        <button type="submit" class="btn btn-primary">Let's Go!</button>
                     </div>
                 </form>
             </section>
-
-            <div class="alert alert-info nav-unauthenticated" style="margin-top: 2rem;">
-                Next you will create your sailConnect account, or sign in if you already have one. <strong>Already have an account?</strong> <a href="/signin" style="color: var(--teal); font-weight: 600;">Sign in</a>.
-            </div>
         </div>
     </main>

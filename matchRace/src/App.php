@@ -33,6 +33,7 @@ final class App
     {
         match ([$method, $path]) {
             ['GET', '/'] => $this->home(),
+            ['GET', '/register'] => $this->redirect($this->registerUrl()),
             ['GET', '/join'] => $this->joinForm(),
             ['POST', '/join'] => $this->join(),
             ['GET', '/dashboard'] => $this->dashboard(),
@@ -45,26 +46,30 @@ final class App
 
     private function home(): void
     {
+        $this->requireEnrolled(false);
         $this->render('home', ['title' => 'Match Race', 'active' => 'home']);
     }
 
+    /** Step two of joining: the user has a sailConnect account and now chooses a user type. */
     private function joinForm(string $error = ''): void
     {
-        $user = $this->currentUser();
-        if ($user !== null) {
-            $this->redirect('/dashboard');
+        $identity = $this->identity();
+        if ($identity === null) {
+            $this->redirect($this->registerUrl());
         }
-        $type = (string) ($_GET['type'] ?? '');
-        $this->render('join', [
-            'title' => 'Join Now',
-            'active' => 'join',
-            'selected' => isset(UserRepository::TYPES[$type]) ? $type : '',
-            'error' => $error,
-        ]);
+        if ($this->users()->find($identity['user_id']) !== null) {
+            $this->redirect('/');
+        }
+        $this->render('join', ['title' => 'Join Now', 'active' => 'join', 'error' => $error]);
     }
 
     private function join(): void
     {
+        $identity = $this->identity();
+        if ($identity === null) {
+            $this->redirect($this->registerUrl());
+        }
+
         $type = (string) ($_POST['user_type'] ?? '');
         if (!isset(UserRepository::TYPES[$type])) {
             http_response_code(422);
@@ -72,26 +77,13 @@ final class App
             return;
         }
 
-        $identity = $this->identity();
-        if ($identity === null) {
-            // Register (or sign in) with sailConnect first; auth brings the user back here with the choice kept.
-            $this->redirect($this->authConfig->appUrl() . '/register?return=' . rawurlencode($this->url('/join?type=' . $type)));
-        }
-
         $this->users()->create($identity['user_id'], $type);
-        $this->redirect('/dashboard');
+        $this->redirect('/');
     }
 
     private function dashboard(): void
     {
-        $identity = $this->identity();
-        if ($identity === null) {
-            $this->redirect($this->verifier->signInUrl($this->url('/dashboard')));
-        }
-        $user = $this->users()->find($identity['user_id']);
-        if ($user === null) {
-            $this->redirect('/join');
-        }
+        $user = $this->requireEnrolled(true);
         $this->render('dashboard', [
             'title' => 'Dashboard',
             'active' => 'dashboard',
@@ -99,6 +91,35 @@ final class App
             'owners' => $this->users()->namesByType('boat_owner'),
             'crew' => $this->users()->namesByType('crew'),
         ]);
+    }
+
+    /**
+     * A signed-in user without a Match Race record is sent to /join. A signed-out visitor is sent to sign in
+     * when $signInRequired, else allowed through (the landing page).
+     *
+     * @return array<string,mixed>|null The user's Match Race row
+     */
+    private function requireEnrolled(bool $signInRequired): ?array
+    {
+        $identity = $this->identity();
+        if ($identity === null) {
+            if ($signInRequired) {
+                $this->redirect($this->verifier->signInUrl($this->url('/dashboard')));
+            }
+            return null;
+        }
+        $user = $this->users()->find($identity['user_id']);
+        if ($user === null) {
+            $this->redirect('/join');
+        }
+
+        return $user;
+    }
+
+    /** The auth "join or sign in" page, which returns to the user-type step. */
+    private function registerUrl(): string
+    {
+        return $this->authConfig->appUrl() . '/start?return=' . rawurlencode($this->url('/join'));
     }
 
     private function notFound(): void
@@ -116,14 +137,6 @@ final class App
         }
 
         return $this->identity;
-    }
-
-    /** The signed-in user's Match Race row, or null when signed out or not yet joined. @return array<string,mixed>|null */
-    private function currentUser(): ?array
-    {
-        $identity = $this->identity();
-
-        return $identity === null ? null : $this->users()->find($identity['user_id']);
     }
 
     private function users(): UserRepository
@@ -167,7 +180,13 @@ final class App
     /** @param array<string,mixed> $vars */
     private function render(string $view, array $vars): void
     {
-        $vars += ['signedIn' => $this->identity() !== null, 'identity' => $this->identity(), 'profileUrl' => $this->authConfig->appUrl() . '/profile'];
+        $identity = $this->identity();
+        $vars += [
+            'signedIn' => $identity !== null,
+            'enrolled' => $identity !== null && $this->users()->find($identity['user_id']) !== null,
+            'identity' => $identity,
+            'profileUrl' => $this->authConfig->appUrl() . '/profile',
+        ];
         extract($vars);
         $h = static fn(mixed $s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
         $typeLabels = UserRepository::TYPES;

@@ -2,8 +2,13 @@
         <div class="hero-content">
             <h1>Match Race</h1>
             <p>Match boats and crew for racing.</p>
-            <p class="nav-unauthenticated" style="margin-top: 2rem;"><a href="/join" class="btn btn-accent">Join Now</a></p>
-            <p class="nav-authenticated" style="margin-top: 2rem;"><a href="/dashboard" class="btn btn-accent">Go to Dashboard</a></p>
+            <p style="margin-top: 2rem;">
+<?php if ($enrolled): ?>
+                <a href="/dashboard" class="btn btn-accent">Go to Dashboard</a>
+<?php else: ?>
+                <a href="/join" class="btn btn-accent">Join Now</a>
+<?php endif; ?>
+            </p>
         </div>
     </section>
 

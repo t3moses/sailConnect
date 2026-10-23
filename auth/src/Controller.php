@@ -45,6 +45,8 @@ final class Controller
 
         $routes = [
             'GET /' => 'home',
+            'GET /start' => 'startForm',
+            'POST /start' => 'start',
             'GET /register' => 'registerForm',
             'POST /register' => 'register',
             'GET /signin' => 'signinForm',
@@ -77,6 +79,32 @@ final class Controller
     private function home(): void
     {
         $this->redirect($this->user ? '/profile' : '/signin');
+    }
+
+    /**
+     * Email-first entry point for applications ("Join now"): the visitor does not need to know whether they already
+     * have an account. An existing email continues to sign-in, a new one to registration, with the email filled in.
+     */
+    private function startForm(string $email = '', string $error = ''): void
+    {
+        if ($this->user) {
+            $this->redirect($this->returnUrl() ?? '/profile');
+        }
+        $this->render('start', ['title' => 'Join or sign in', 'email' => $email, 'error' => $error, 'return' => $this->returnParam()], $error === '' ? 200 : 422);
+    }
+
+    private function start(): void
+    {
+        $email = strtolower(trim((string) ($_POST['email_address'] ?? '')));
+        if (!Validator::email($email)) {
+            $this->startForm($email, 'Enter a valid email address.');
+            return;
+        }
+        if ($this->users->emailExists($email)) {
+            $this->render('signin', ['title' => 'Sign in', 'errors' => [], 'email' => $email, 'return' => $this->returnParam(), 'notice' => 'account-found']);
+            return;
+        }
+        $this->render('register', $this->registerVars(['email_address' => $email], []));
     }
 
     private function signinForm(): void

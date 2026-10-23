@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="<?= $signedIn ? 'authenticated' : 'unauthenticated' ?>">
+<html lang="en" class="<?= $enrolled ? 'authenticated' : 'unauthenticated' ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,22 +20,31 @@
                 <ul id="main-nav">
                     <li><a href="/" class="<?= $active === 'home' ? 'active' : '' ?>">Home</a></li>
 
-                    <li class="nav-unauthenticated">
-                        <a href="/signin" class="nav-btn nav-btn-secondary">Sign In</a>
-                    </li>
-                    <li class="nav-unauthenticated">
-                        <a href="/join" class="nav-btn nav-btn-primary <?= $active === 'join' ? 'active' : '' ?>">Join Now</a>
-                    </li>
-
-                    <li class="nav-authenticated">
+<?php if ($enrolled): ?>
+                    <li>
                         <a href="/dashboard" class="<?= $active === 'dashboard' ? 'active' : '' ?>">Dashboard</a>
                     </li>
-                    <li class="nav-authenticated user-greeting">
+                    <li class="user-greeting">
                         <span>Hi, <span class="user-name"><?= $h($identity['first_name'] ?? '') ?></span>!</span>
                     </li>
-                    <li class="nav-authenticated">
+                    <li>
                         <a href="/signout" class="sign-out-btn">Sign Out</a>
                     </li>
+<?php else: ?>
+<?php if (!$signedIn): ?>
+                    <li>
+                        <a href="/signin" class="nav-btn nav-btn-secondary">Sign In</a>
+                    </li>
+<?php endif; ?>
+                    <li>
+                        <a href="/join" class="nav-btn nav-btn-primary <?= $active === 'join' ? 'active' : '' ?>">Join Now</a>
+                    </li>
+<?php if ($signedIn): ?>
+                    <li>
+                        <a href="/signout" class="sign-out-btn">Sign Out</a>
+                    </li>
+<?php endif; ?>
+<?php endif; ?>
                 </ul>
             </nav>
         </div>
@@ -47,7 +56,7 @@
     <footer>
         <div class="footer-content">
             <p><strong>Nepean Sailing Club — Match Race</strong></p>
-            <p><a href="https://nsc.ca">NSC Website</a><?php if (!$signedIn): ?> | <a href="/join">Join Now</a><?php endif; ?></p>
+            <p><a href="https://nsc.ca">NSC Website</a><?php if (!$enrolled): ?> | <a href="/join">Join Now</a><?php endif; ?></p>
             <p style="margin-top: 1rem; opacity: 0.7;">&copy; 2026 All Rights Reserved</p>
         </div>
     </footer>
