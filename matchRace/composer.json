@@ -1,0 +1,30 @@
+{
+    "name": "sailconnect/match-race",
+    "description": "Match Race - match boats and crew for racing",
+    "license": "proprietary",
+    "type": "project",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../auth"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "ext-pdo": "*",
+        "ext-pdo_sqlite": "*",
+        "sailconnect/auth": "*@dev",
+        "vlucas/phpdotenv": "^5.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "MatchRace\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
