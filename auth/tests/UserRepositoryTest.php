@@ -13,8 +13,8 @@ class UserRepositoryTest extends DatabaseTestCase
         $c = $this->makeUser('Tim', 'Mills');
 
         $this->assertSame('TimM', $a['display_name']);
-        $this->assertSame('TimM1', $b['display_name']);
-        $this->assertSame('TimM2', $c['display_name']);
+        $this->assertSame('TimM2', $b['display_name']);
+        $this->assertSame('TimM3', $c['display_name']);
     }
 
     public function testDisplayNameIsRecomputedWhenTheNameChanges(): void
@@ -24,7 +24,7 @@ class UserRepositoryTest extends DatabaseTestCase
 
         $this->users->updateProfile($other['user_id'], ['first_name' => 'Tim', 'last_name' => 'Miller', 'is_member' => false]);
 
-        $this->assertSame('TimM1', $this->users->find($other['user_id'])['display_name']);
+        $this->assertSame('TimM2', $this->users->find($other['user_id'])['display_name']);
     }
 
     public function testKeepingTheSameNameKeepsTheSameDisplayName(): void
@@ -34,7 +34,7 @@ class UserRepositoryTest extends DatabaseTestCase
 
         $this->users->updateProfile($b['user_id'], ['first_name' => 'Tim', 'last_name' => 'Morgan', 'is_member' => false]);
 
-        $this->assertSame('TimM1', $this->users->find($b['user_id'])['display_name']);
+        $this->assertSame('TimM2', $this->users->find($b['user_id'])['display_name']);
     }
 
     public function testEmailsAreUniqueIgnoringCase(): void

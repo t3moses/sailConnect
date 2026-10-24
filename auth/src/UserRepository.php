@@ -168,7 +168,7 @@ final class UserRepository
         $base = Validator::displayNameBase($first, $last);
         $st = $this->db->prepare('SELECT 1 FROM users WHERE display_name = ? AND user_id <> ?');
         $candidate = $base;
-        for ($n = 1; ; $n++) {
+        for ($n = 2; ; $n++) {
             $st->execute([$candidate, $selfId ?? '']);
             if (!$st->fetchColumn()) {
                 return $candidate;

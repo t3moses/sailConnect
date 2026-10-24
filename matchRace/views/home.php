@@ -16,7 +16,7 @@
         <div class="card-grid">
             <div class="card">
                 <h3>⛵ Boat Owners</h3>
-                <p>List your boat and find crew for the match race series.</p>
+                <p>List your boat and find crew for racing.</p>
             </div>
             <div class="card">
                 <h3>🌊 Crew</h3>
